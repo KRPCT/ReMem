@@ -30,6 +30,7 @@ vi.mock("../../../../../auth", () => ({
   auth: vi.fn(),
 }));
 
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import {
   createCardAction,
@@ -94,6 +95,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await prisma.card.deleteMany({ where: { deckId: TEST_DECK_ID } });
+  vi.mocked(revalidatePath).mockClear();
 });
 
 function makeFormData(extra: Record<string, string> = {}): FormData {
@@ -187,7 +189,29 @@ async function ensureOtherUser() {
 }
 
 describe("toggleFavoriteAction", () => {
-  it("flips isFavorite on the card", async () => {
+  it("flips isFavorite and returns the new boolean", async () => {
+    (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      user: { id: TEST_USER_ID },
+    });
+    const card = await prisma.card.create({
+      data: { deckId: TEST_DECK_ID, type: "qa" },
+    });
+    try {
+      const r1 = await toggleFavoriteAction(card.id, TEST_DECK_ID);
+      expect(r1.isFavorite).toBe(true);
+      const after1 = await prisma.card.findUnique({ where: { id: card.id } });
+      expect(after1?.isFavorite).toBe(true);
+
+      const r2 = await toggleFavoriteAction(card.id, TEST_DECK_ID);
+      expect(r2.isFavorite).toBe(false);
+      const after2 = await prisma.card.findUnique({ where: { id: card.id } });
+      expect(after2?.isFavorite).toBe(false);
+    } finally {
+      await prisma.card.deleteMany({ where: { id: card.id } });
+    }
+  });
+
+  it("does not call revalidatePath (isolated toggle, D-05)", async () => {
     (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       user: { id: TEST_USER_ID },
     });
@@ -196,11 +220,7 @@ describe("toggleFavoriteAction", () => {
     });
     try {
       await toggleFavoriteAction(card.id, TEST_DECK_ID);
-      const after1 = await prisma.card.findUnique({ where: { id: card.id } });
-      expect(after1?.isFavorite).toBe(true);
-      await toggleFavoriteAction(card.id, TEST_DECK_ID);
-      const after2 = await prisma.card.findUnique({ where: { id: card.id } });
-      expect(after2?.isFavorite).toBe(false);
+      expect(revalidatePath).not.toHaveBeenCalled();
     } finally {
       await prisma.card.deleteMany({ where: { id: card.id } });
     }
@@ -235,10 +255,10 @@ describe("toggleFavoriteAction", () => {
     // Card starts as isFavorite=true. We make the first updateMany
     // simulate a concurrent flip (count=0) and the second (retry)
     // succeed (count=1). The retry path should re-read the value
-    // (still true, since the race was simulated — no other writer
+    // (still true, since the race was simulated -- no other writer
     // actually changed it) and flip it to false.
     //
-    // We install the mock with Object.defineProperty (NOT vi.spyOn —
+    // We install the mock with Object.defineProperty (NOT vi.spyOn --
     // Prisma's delegate property descriptor doesn't survive vi.spyOn's
     // mockRestore cleanly across tests in this file). Save the
     // original method, swap in a controlled stub, and restore exactly
@@ -270,10 +290,11 @@ describe("toggleFavoriteAction", () => {
       configurable: true,
     });
     try {
-      await toggleFavoriteAction(card.id, TEST_DECK_ID);
-      // After retry: the value was flipped (true → false). The first
+      const result = await toggleFavoriteAction(card.id, TEST_DECK_ID);
+      // After retry: the value was flipped (true -> false). The first
       // conditional update returned count=0 (race simulated); the
       // retry re-read true and flipped to false.
+      expect(result.isFavorite).toBe(false);
       const after = await prisma.card.findUnique({ where: { id: card.id } });
       expect(after?.isFavorite).toBe(false);
     } finally {
@@ -289,7 +310,29 @@ describe("toggleFavoriteAction", () => {
 });
 
 describe("toggleSuspendedAction", () => {
-  it("flips suspended on the card", async () => {
+  it("flips suspended and returns the new boolean", async () => {
+    (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      user: { id: TEST_USER_ID },
+    });
+    const card = await prisma.card.create({
+      data: { deckId: TEST_DECK_ID, type: "qa" },
+    });
+    try {
+      const r1 = await toggleSuspendedAction(card.id, TEST_DECK_ID);
+      expect(r1.suspended).toBe(true);
+      const after1 = await prisma.card.findUnique({ where: { id: card.id } });
+      expect(after1?.suspended).toBe(true);
+
+      const r2 = await toggleSuspendedAction(card.id, TEST_DECK_ID);
+      expect(r2.suspended).toBe(false);
+      const after2 = await prisma.card.findUnique({ where: { id: card.id } });
+      expect(after2?.suspended).toBe(false);
+    } finally {
+      await prisma.card.deleteMany({ where: { id: card.id } });
+    }
+  });
+
+  it("does not call revalidatePath (isolated toggle, D-05)", async () => {
     (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       user: { id: TEST_USER_ID },
     });
@@ -298,11 +341,7 @@ describe("toggleSuspendedAction", () => {
     });
     try {
       await toggleSuspendedAction(card.id, TEST_DECK_ID);
-      const after1 = await prisma.card.findUnique({ where: { id: card.id } });
-      expect(after1?.suspended).toBe(true);
-      await toggleSuspendedAction(card.id, TEST_DECK_ID);
-      const after2 = await prisma.card.findUnique({ where: { id: card.id } });
-      expect(after2?.suspended).toBe(false);
+      expect(revalidatePath).not.toHaveBeenCalled();
     } finally {
       await prisma.card.deleteMany({ where: { id: card.id } });
     }

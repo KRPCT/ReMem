@@ -337,7 +337,7 @@ export async function deleteCardAction(formData: FormData): Promise<void> {
 export async function toggleFavoriteAction(
   cardId: string,
   deckId: string
-): Promise<void> {
+): Promise<{ isFavorite: boolean }> {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("未登录");
@@ -351,17 +351,18 @@ export async function toggleFavoriteAction(
     });
     if (!card) throw new Error("未找到卡片");
 
-    // Conditional update — succeeds only if the value hasn't changed
+    // Conditional update -- succeeds only if the value hasn't changed
     // since we read it. If a concurrent request flipped it in the
     // window between read and write, count=0 and we re-read + retry
     // once. (WR-04: read-modify-write race.)
+    let newValue = !card.isFavorite;
     const result = await prisma.card.updateMany({
       where: {
         id: cardId,
         deck: { userId, id: deckId },
         isFavorite: card.isFavorite,
       },
-      data: { isFavorite: !card.isFavorite },
+      data: { isFavorite: newValue },
     });
 
     if (result.count === 0) {
@@ -370,18 +371,21 @@ export async function toggleFavoriteAction(
         select: { isFavorite: true },
       });
       if (!fresh) throw new Error("未找到卡片");
+      newValue = !fresh.isFavorite;
       await prisma.card.updateMany({
         where: {
           id: cardId,
           deck: { userId, id: deckId },
           isFavorite: fresh.isFavorite,
         },
-        data: { isFavorite: !fresh.isFavorite },
+        data: { isFavorite: newValue },
       });
     }
 
-    revalidatePath(`/decks/${deckId}`);
-    revalidatePath(`/decks/${deckId}/cards/${cardId}`);
+    // No revalidatePath: this toggle's effect is isolated to the button
+    // on the card-detail page. The client updates local state from the
+    // returned value (D-05).
+    return { isFavorite: newValue };
   } catch (e) {
     if (e instanceof AuthError || e instanceof ZodError) throw e;
     throw e;
@@ -391,7 +395,7 @@ export async function toggleFavoriteAction(
 export async function toggleSuspendedAction(
   cardId: string,
   deckId: string
-): Promise<void> {
+): Promise<{ suspended: boolean }> {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("未登录");
@@ -407,13 +411,14 @@ export async function toggleSuspendedAction(
 
     // Conditional update + 1-retry on race. See toggleFavoriteAction
     // for the rationale. (WR-04)
+    let newValue = !card.suspended;
     const result = await prisma.card.updateMany({
       where: {
         id: cardId,
         deck: { userId, id: deckId },
         suspended: card.suspended,
       },
-      data: { suspended: !card.suspended },
+      data: { suspended: newValue },
     });
 
     if (result.count === 0) {
@@ -422,18 +427,21 @@ export async function toggleSuspendedAction(
         select: { suspended: true },
       });
       if (!fresh) throw new Error("未找到卡片");
+      newValue = !fresh.suspended;
       await prisma.card.updateMany({
         where: {
           id: cardId,
           deck: { userId, id: deckId },
           suspended: fresh.suspended,
         },
-        data: { suspended: !fresh.suspended },
+        data: { suspended: newValue },
       });
     }
 
-    revalidatePath(`/decks/${deckId}`);
-    revalidatePath(`/decks/${deckId}/cards/${cardId}`);
+    // No revalidatePath: this toggle's effect is isolated to the button
+    // on the card-detail page. The client updates local state from the
+    // returned value (D-05).
+    return { suspended: newValue };
   } catch (e) {
     if (e instanceof AuthError || e instanceof ZodError) throw e;
     throw e;

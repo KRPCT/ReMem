@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getReviewHeatmap, sampleRetention } from "@/lib/stats";
 import type { HeatmapDay, RetentionPoint } from "@/lib/stats";
 import { ReviewHeatmap } from "@/components/stats/heatmap";
-import { RetentionCurve } from "@/components/stats/retention-curve";
+import { RetentionCurveLazy } from "@/components/stats/retention-curve-lazy";
 import { ZhTitle } from "@/components/typography/zh-title";
 import { ZhCaption } from "@/components/typography/zh-caption";
 
@@ -35,7 +35,7 @@ export default async function StatsPage() {
       </div>
       <div className="grid gap-xxl animate-section-in">
         <ReviewHeatmap data={heatmapData} />
-        <RetentionCurve data={globalRetention} avgStability={globalAvgStability} />
+        <RetentionCurveLazy data={globalRetention} avgStability={globalAvgStability} />
       </div>
     </main>
   );

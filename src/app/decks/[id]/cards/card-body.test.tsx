@@ -2,6 +2,17 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { CardBody } from "./card-body";
 
+// next/dynamic with ssr:false renders only a loading placeholder in jsdom.
+// Mock the lazy wrapper to return the real component so card-body tests can
+// assert on rendered markdown content (the real component is tested directly
+// in markdown-renderer.test.tsx).
+vi.mock("@/components/markdown/markdown-renderer-lazy", async () => {
+  const { MarkdownRenderer } = await import(
+    "@/components/markdown/markdown-renderer"
+  );
+  return { MarkdownRendererLazy: MarkdownRenderer };
+});
+
 afterEach(() => {
   cleanup();
   // Defensive: @testing-library cleanup unmounts React trees, but
@@ -353,6 +364,73 @@ describe("CardBody (interactive)", () => {
       cardId: "card-int-1",
       userPicks: [1],
     });
+  });
+
+  // Regression (Phase 13 perf follow-up): clicking "显示答案" in the study
+  // session reveals the card WITHOUT a pick (judgment stays null). Before
+  // the fix, showCorrectHighlight was judgment-gated, so choice/multi/judge
+  // cards revealed this way showed NO correct answer
+  // ("单多选和判断点击显示答案不会显示具体选项"). showAnswer alone must
+  // now surface the correct option/button.
+  it("reveals the correct choice on showAnswer even without a pick", () => {
+    render(
+      <CardBody
+        type="choice"
+        cardId="card-reveal-nopick"
+        frontContent="Pick one"
+        backContent={null}
+        typeData={{
+          type: "choice",
+          options: ["Alpha", "Beta", "Gamma"],
+          answer: 1, // Beta
+          shuffle: false,
+          pinLastOption: false,
+        }}
+        showAnswer
+        interactive
+      />
+    );
+    // No click happened; showAnswer alone must surface the correct mark.
+    expect(screen.getByLabelText("正确答案")).toBeDefined();
+  });
+
+  it("reveals all correct multi_choice options on showAnswer without a pick", () => {
+    render(
+      <CardBody
+        type="multi_choice"
+        cardId="card-mc-reveal-nopick"
+        frontContent="Pick all"
+        backContent={null}
+        typeData={{
+          type: "multi_choice",
+          options: ["A", "B", "C", "D"],
+          answers: [0, 2],
+          shuffle: false,
+          pinLastOption: false,
+        }}
+        showAnswer
+        interactive
+      />
+    );
+    // Two correct options must show the 正确答案 mark, pick or no pick.
+    expect(screen.getAllByLabelText("正确答案").length).toBe(2);
+  });
+
+  it("highlights the correct judge button on showAnswer without a pick", () => {
+    render(
+      <CardBody
+        type="judge"
+        cardId="card-judge-reveal-nopick"
+        frontContent="2 + 2 = 4 ?"
+        backContent={null}
+        typeData={{ type: "judge", correct: true }}
+        showAnswer
+        interactive
+      />
+    );
+    // 正确 is the right answer; it must read as highlighted (emerald)
+    // even though the user never clicked a button.
+    expect(screen.getByLabelText("正确").className).toContain("emerald");
   });
 
   it("reports incorrect when the user picks a wrong choice", () => {

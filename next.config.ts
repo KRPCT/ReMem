@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import withBundleAnalyzer from "@next/bundle-analyzer";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -8,12 +9,14 @@ const nextConfig: NextConfig = {
     // a deck and being redirected to /decks/[id], the browser would serve
     // a stale /decks HTML when the user navigated back, hiding the new
     // deck until a hard refresh. Every page in this app is user-scoped
-    // and changes often — 0 is the right value.
+    // and changes often - 0 is the right value.
     staleTimes: {
       dynamic: 0,
       static: 180,
     },
+    optimizePackageImports: ["lucide-react", "recharts"],
   },
 };
 
-export default nextConfig;
+const analyze = withBundleAnalyzer({ enabled: process.env.ANALYZE === "true" });
+export default analyze(nextConfig);
