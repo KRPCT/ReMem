@@ -1,0 +1,605 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+ * ReMem Design v2 — Fluent 2 token naming + Linux.do (Discourse)
+ * values + glassmorphism + global Chinese-first typography.
+ *
+ * Default is DARK MODE (linux.do convention). Light mode is opt-in
+ * via `<html data-theme="light">` — toggle lives in SiteHeader.
+ *
+ * All values are HSL triplets (no `hsl()` wrapper) so Tailwind's
+ * `hsl(var(--background))` convention works for shadcn components.
+ *
+ * Font stack (next/font/google, self-hosted, see src/app/layout.tsx):
+ *   - --font-inter         (Latin body)
+ *   - --font-wenkai        (CJK display: LXGW WenKai TC 霞鹜文楷)
+ *   - --font-mono          (Latin small caps: JetBrains Mono)
+ * ============================================================ */
+
+@layer base {
+  :root {
+    /* === Neutral ramp (dark default, deeper midnight palette) ===
+     * Page bg drops to 4% lightness (#08090C) for a deep midnight
+     * feel without going pure black. Card surface sits at 8% (#0F1116)
+     * — a 4% lightness gap keeps the card / page hierarchy readable
+     * under the 80% black modal overlay. Stroke tones lift one step
+     * (14/18/22) so borders don't vanish on the deeper background. */
+    --color-neutral-background-1: 222 20% 8%;   /* #0F1116 card surface */
+    --color-neutral-background-2: 222 25% 4%;   /* #08090C page bg (deepest) */
+    --color-neutral-background-3: 222 22% 11%;  /* #15171E card hover / input bg */
+    --color-neutral-background-4: 222 20% 14%;  /* #1D1F26 hover state */
+    --color-neutral-background-5: 222 18% 18%;  /* #26282F border on hover */
+    --color-neutral-background-6: 222 15% 22%;  /* #2F3138 dividers */
+    --color-neutral-foreground-1: 240 9%  96%;  /* #f5f5f7 primary (15.4:1) */
+    --color-neutral-foreground-2: 240 5%  81%;  /* #c5c5cc secondary (9.1:1) */
+    --color-neutral-foreground-3: 240 5%  56%;  /* #8a8a93 tertiary (4.6:1) */
+    --color-neutral-foreground-4: 240 5%  43%;  /* #6a6a73 muted (large only) */
+    --color-neutral-stroke-1: 222 18% 14%;      /* #1F2229 subtle border */
+    --color-neutral-stroke-2: 222 15% 18%;      /* #262830 */
+    --color-neutral-stroke-3: 222 12% 22%;      /* #2E3038 */
+
+    /* === Brand (muted sage green, 冷淡风) ===
+     * Cool teal-green at 45% saturation — still muted / "sexless /
+     * minimalist" (not vivid), but with enough presence to pop
+     * against the deeper dark midnight bg (#08090C). `foreground-1`
+     * (dark text on brand) is dark enough for AA on the lighter
+     * sage tone. Contrast: #4ebca5 background + #14161b text ~ 4.9:1 (AA)
+     *
+     * Dark mode: muted sage green. Light mode: professional azure. */
+    --color-brand-background: 162 45% 58%;         /* #4ebca5 — sage, 45% sat */
+    --color-brand-background-hover: 162 50% 64%;
+    --color-brand-background-pressed: 162 40% 48%;
+    --color-brand-foreground-1: 222 22% 9%;      /* #14161b on brand */
+    --color-brand-foreground-2: 162 45% 58%;
+    --color-brand-background-subtle: 162 45% 58% / 0.18;
+
+    /* === Semantic (success retuned to harmonize with sage brand) === */
+    --color-status-success: 162 45% 48%;
+    --color-status-success-subtle: 162 45% 48% / 0.14;
+    --color-status-warning: 38 92% 50%;
+    --color-status-warning-subtle: 38 92% 50% / 0.12;
+    --color-status-error:   0 84% 60%;
+    --color-status-error-subtle:   0 84% 60% / 0.12;
+
+    /* === Per-type accent colors (Phase 5 redesign)
+     * Each card type carries one accent. Surfaces read it via
+     * `var(--type-accent-{type})` (HSL triplet, no wrapper). Used as
+     * a 4px top border on the gallery tile + the type badge tint.
+     * Saturation kept < 60% so the accent stays "muted / 冷淡" and
+     * doesn't fight the brand sage at 162°. Light-mode overrides
+     * deeper the values for AA contrast on the white card surface.
+     *
+     * Defaults mirror the existing card-type-badge palette but move
+     * to CSS variables so the user can override per-type from the
+     * /settings page (persisted in localStorage, applied on mount). */
+    --type-accent-qa:           162 50% 58%;   /* sage (echoes brand) */
+    --type-accent-choice:       217 80% 60%;   /* azure */
+    --type-accent-multi_choice: 280 60% 62%;   /* violet */
+    --type-accent-fill:         38  92% 56%;   /* amber */
+    --type-accent-judge:        350 70% 60%;   /* rose */
+
+    /* === Typography === */
+    --font-family-base: var(--font-inter), "HarmonyOS Sans SC", "PingFang SC",
+                        -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --font-family-display: var(--font-wenkai), "Source Han Serif SC",
+                          "Songti SC", "STKaiti", Georgia, serif;
+    --font-family-mono: var(--font-mono), "Cascadia Code", "Fira Code",
+                        "Consolas", "Menlo", monospace;
+
+    /* === Spacing scale (4px base) === */
+    --spacing-xxs: 2px;
+    --spacing-xs: 4px;
+    --spacing-s: 8px;
+    --spacing-snudge: 10px;
+    --spacing-m: 12px;
+    --spacing-l: 16px;
+    --spacing-xl: 20px;
+    --spacing-xxl: 24px;
+    --spacing-xxxl: 32px;
+    --spacing-hero: 48px;
+    --spacing-mega: 64px;
+
+    /* === Border radius === */
+    --radius-none: 0;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 10px;     /* card default (linux.do convention) */
+    --radius-circular: 9999px;
+
+    /* === Glassmorphism === */
+    --glass-nav-bg: 20 22 28 / 0.72;
+    --glass-nav-blur: 16px;
+    --glass-nav-saturate: 180%;
+
+    --glass-modal-bg: 20 22 28 / 0.85;
+    --glass-modal-blur: 20px;
+    --glass-modal-saturate: 200%;
+
+    --glass-dropdown-bg: 28 30 38 / 0.92;
+    --glass-dropdown-blur: 12px;
+    --glass-dropdown-saturate: 180%;
+
+    /* === Motion === */
+    --duration-ultra-fast: 50ms;
+    --duration-faster: 100ms;
+    --duration-fast: 150ms;
+    --duration-normal: 200ms;
+    --duration-slow: 300ms;
+    --duration-slower: 400ms;
+    --duration-ultra-slow: 500ms;
+    --curve-easy-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --curve-easy-in:  cubic-bezier(0.7, 0, 0.84, 0);
+
+    /* === Layout === */
+    --layout-content-max-width: 1024px;
+    --layout-reading-width: 720px;
+    --layout-form-width: 480px;
+    --layout-auth-width: 400px;
+    --layout-top-nav-height: 56px;
+    --touch-target-min: 44px;
+
+    /* === Statistics (Phase 9) ===
+     * Heatmap cell size + 5-tier review-count color scale. Values are
+     * HSL triplets (no hsl() wrapper) consumed via hsl(var(--stats-heat-N)).
+     * tier-0 borrows the neutral surface; tiers 1-4 ramp the sage hue. */
+    --stats-heatmap-cell: 10px;
+    --stats-heat-0: var(--color-neutral-background-3);  /* 0 reviews — muted surface */
+    --stats-heat-1: 162 45% 30%;   /* 1-3 reviews — dim sage */
+    --stats-heat-2: 162 45% 42%;   /* 4-8 reviews — mid sage */
+    --stats-heat-3: 162 45% 52%;   /* 9-15 reviews — bright sage */
+    --stats-heat-4: 162 45% 65%;   /* 16+ reviews — peak sage (near brand) */
+
+    /* ============================================================
+     * Shadcn semantic mapping (HSL triplets) — feeds Tailwind
+     * `hsl(var(--background))` convention used by shadcn primitives
+     * ============================================================ */
+    --background: var(--color-neutral-background-2);
+    --foreground: var(--color-neutral-foreground-1);
+    --card: var(--color-neutral-background-1);
+    --card-foreground: var(--color-neutral-foreground-1);
+    --popover: var(--color-neutral-background-1);
+    --popover-foreground: var(--color-neutral-foreground-1);
+    --primary: var(--color-brand-background);
+    --primary-foreground: var(--color-brand-foreground-1);
+    --secondary: var(--color-neutral-background-3);
+    --secondary-foreground: var(--color-neutral-foreground-1);
+    --muted: var(--color-neutral-background-3);
+    --muted-foreground: var(--color-neutral-foreground-3);
+    --accent: var(--color-neutral-background-4);
+    --accent-foreground: var(--color-neutral-foreground-1);
+    --destructive: var(--color-status-error);
+    --destructive-foreground: 240 9% 96%;
+    --border: var(--color-neutral-stroke-1);
+    --input: var(--color-neutral-stroke-1);
+    --ring: var(--color-brand-background);
+    --radius: var(--radius-xl);
+  }
+
+  /* Light mode opt-in (overrides the dark default) — azure brand.
+   * Page background distinguishes from card surface (#f5f5f5 vs #fff).
+   * Brand uses a deep azure (`48%` L) so brand button text reads
+   * with AA contrast on the white page.
+   *
+   * Brand-by-theme: dark mode keeps the muted sage green (冷淡风);
+   * light mode uses a professional azure (Microsoft / Stripe / Linear
+   * vibe) for calm, trustworthy feel. */
+  [data-theme="light"] {
+    /* === Neutral ramp (pure grayscale, Fluent 2 light) === */
+    --color-neutral-background-1: 0 0% 100%;   /* #ffffff card surface */
+    --color-neutral-background-2: 0 0% 98%;    /* #fafafa page bg */
+    --color-neutral-background-3: 0 0% 96%;    /* #f5f5f5 subtle hover */
+    --color-neutral-background-4: 0 0% 93%;    /* #ededed dividers */
+    --color-neutral-background-5: 0 0% 89%;    /* #e3e3e3 borders on hover */
+    --color-neutral-background-6: 0 0% 85%;    /* #d8d8d8 */
+    --color-neutral-foreground-1: 0 0% 9%;     /* #171717 (18.6:1) */
+    --color-neutral-foreground-2: 0 0% 22%;    /* #383838 (10.3:1) */
+    --color-neutral-foreground-3: 0 0% 46%;    /* #757575 (4.5:1) */
+    --color-neutral-foreground-4: 0 0% 60%;    /* #999 (3.0:1, large only) */
+    --color-neutral-stroke-1: 0 0% 89%;        /* #e3e3e3 hairline */
+    --color-neutral-stroke-2: 0 0% 93%;
+    --color-neutral-stroke-3: 0 0% 96%;
+
+    /* === Brand — professional azure (paired with dark-mode sage) ===
+     * Light mode uses a deep azure (`48%` L) so white brand button
+     * text reads at ~5.5:1 contrast on the azure background — meets
+     * WCAG AA. Calm / professional / trustworthy feel (Microsoft /
+     * Stripe / Linear vibe). Dark mode brand stays sage green for
+     * the muted 冷淡 / minimalist aesthetic. */
+    --color-brand-background:        217 80% 48%;   /* #1f6feb deep azure */
+    --color-brand-background-hover:  217 85% 54%;
+    --color-brand-background-pressed: 217 75% 42%;
+    --color-brand-background-selected: 217 80% 48%;
+    --color-brand-foreground-1: 240 9% 98%;        /* #f5f5f7 on brand (5.5:1) */
+    --color-brand-foreground-2: 217 80% 48%;       /* text on neutral */
+    --color-brand-stroke-1: 217 80% 48%;
+    --color-brand-stroke-2: 217 80% 42%;
+    --color-brand-background-subtle: 217 80% 48% / 0.10;
+
+    /* === Semantic (slightly deeper for AA on white) === */
+    --color-status-success:        146 80% 35%;   /* #107C10 (4.7:1) */
+    --color-status-success-subtle: 146 80% 35% / 0.10;
+    --color-status-warning:        31  95% 44%;   /* #BF8B00 (4.5:1) */
+    --color-status-warning-subtle: 31  95% 44% / 0.10;
+    --color-status-error:          0   78% 50%;   /* #D83B01 (4.5:1) */
+    --color-status-error-subtle:   0   78% 50% / 0.10;
+
+    /* === Per-type accents (light mode — slightly deeper for AA) === */
+    --type-accent-qa:           162 50% 38%;
+    --type-accent-choice:       217 80% 48%;
+    --type-accent-multi_choice: 280 60% 48%;
+    --type-accent-fill:         38  90% 44%;
+    --type-accent-judge:        350 70% 48%;
+
+    /* === Statistics light-mode overrides (Phase 9) ===
+     * Azure ramp (matches light-mode brand family) for the heatmap. */
+    --stats-heat-0: var(--color-neutral-background-3);  /* #f5f5f5 */
+    --stats-heat-1: 217 80% 82%;   /* azure light tint */
+    --stats-heat-2: 217 80% 65%;
+    --stats-heat-3: 217 80% 52%;
+    --stats-heat-4: 217 80% 40%;
+
+    /* === Glassmorphism light variant === */
+    --glass-nav-bg:        255 255 255 / 0.78;
+    --glass-nav-blur:      16px;
+    --glass-nav-saturate:  180%;
+    --glass-modal-bg:      255 255 255 / 0.88;
+    --glass-modal-blur:    20px;
+    --glass-modal-saturate: 200%;
+    --glass-dropdown-bg:   252 252 252 / 0.94;
+    --glass-dropdown-blur: 12px;
+
+    /* === shadcn semantic mapping ===
+     * Page bg vs card surface must differ by AT LEAST 5% lightness
+     * so dialogs/popovers (`bg-card`) float clearly above the
+     * page in light mode. With the 80% black overlay, a 2%
+     * difference (#fafafa vs #ffffff) is washed out and the
+     * dialog "disappears into" the page — perceived as global
+     * transparency. 4% (this: #f5f5f5 vs #fff) is the visual
+     * minimum. */
+    --background: 0 0% 96%;         /* page bg = #f5f5f5 (4% under card) */
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;             /* card = pure white, distinct from page */
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 217 80% 48%;        /* brand azure */
+    --primary-foreground: 240 9% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 46%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 78% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 89%;
+    --input: 0 0% 89%;
+    --ring: 217 80% 48%;
+    --radius: var(--radius-xl);
+  }
+
+  * { border-color: hsl(var(--border)); }
+  html { color-scheme: dark; }
+  html[data-theme="light"], html:has([data-theme="light"]) { color-scheme: light; }
+
+  body {
+    font-family: var(--font-family-base);
+    font-size: 14px;       /* Fluent 2 base 400 = 14px */
+    line-height: 1.5;
+    color: hsl(var(--foreground));
+    /* === Global background: 3 radial gradients + page base ===
+     * Layered top-to-bottom in the background stack (first listed
+     * paints on top):
+     *   1. brand-tinted glow, top-left, 20% / 0
+     *   2. cool azure glow, bottom-right, 80% / 100%
+     *   3. warm-neutral depth, centered, 50% / 50%
+     *   4. base color from --background
+     * Fixed attachment makes the gradients stay put on scroll, so
+     * the glass surfaces reveal them as the user moves. */
+    background:
+      radial-gradient(ellipse 1200px 600px at 20% 0%,
+                      hsl(var(--color-brand-background) / 0.12) 0%,
+                      transparent 60%),
+      radial-gradient(ellipse 800px 800px at 80% 100%,
+                      hsl(222 70% 60% / 0.10) 0%,
+                      transparent 55%),
+      radial-gradient(circle 1400px at 50% 50%,
+                      hsl(var(--color-neutral-foreground-3) / 0.04) 0%,
+                      transparent 60%),
+      hsl(var(--background));
+    background-attachment: fixed;
+    min-height: 100dvh;
+    /* CJK typography tuning */
+    font-feature-settings: "halt" 1, "palt" 1, "vkrn" 1;
+    text-justify: inter-ideograph;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* === Subtle noise / grain overlay ===
+   * Inline SVG (data URI) so no extra HTTP request is made. The
+   * fractalNoise at high baseFrequency gives a fine paper-like
+   * grain — barely visible but enough to break up the gradient
+   * bands at full-screen zoom. `mix-blend-mode: overlay` keeps the
+   * grain color-neutral so it works on both light and dark.
+   * Sits between the body bg (z=auto) and the page content
+   * (interactive, z=auto+), with pointer-events:none so it never
+   * blocks clicks. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.4 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    background-size: 160px 160px;
+    mix-blend-mode: overlay;
+  }
+  /* Light mode grain needs a touch more opacity to be perceptible
+   * against the white page base. */
+  [data-theme="light"] body::before {
+    opacity: 0.04;
+  }
+
+  /* Light mode: tone the 3 gradients down so they don't fight with
+   * the white page base. Same hue families as dark mode (sage top-
+   * left, cool blue bottom-right, neutral center) — just lower
+   * alpha. */
+  [data-theme="light"] body {
+    background:
+      radial-gradient(ellipse 1200px 600px at 20% 0%,
+                      hsl(var(--color-brand-background) / 0.05) 0%,
+                      transparent 60%),
+      radial-gradient(ellipse 800px 800px at 80% 100%,
+                      hsl(217 70% 60% / 0.04) 0%,
+                      transparent 55%),
+      radial-gradient(circle 1400px at 50% 50%,
+                      hsl(var(--color-neutral-foreground-3) / 0.02) 0%,
+                      transparent 60%),
+      hsl(var(--background));
+  }
+
+  /* Display + mono families. Use the `.font-display` / `.font-mono`
+   * utility classes (NOT inline `style={{ fontFamily: "..." }}`)
+   * so the entire app routes through one token system.
+   *
+   * === Font system (3 tokens, used throughout the app) ===
+   *   --font-family-base    : body text (Inter + CJK fallbacks)
+   *   --font-family-display : H1/H2/display text (LXGW WenKai TC + Songti fallback)
+   *   --font-family-mono    : monospace (JetBrains Mono + Cascadia fallback)
+   *
+   * USE: prefer the `.font-display` / `.font-mono` Tailwind utility
+   * classes over inline `style={{ fontFamily: "..." }}` for consistency. */
+  .font-display { font-family: var(--font-family-display); }
+  .font-mono { font-family: var(--font-family-mono); }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ============================================================
+ * GLASSMORPHISM UTILITIES
+ * Tailwind v3 doesn't ship `backdrop-blur` + rgba bg by default;
+ * compose via existing backdrop-blur + a custom bg color.
+ * ============================================================ */
+@layer utilities {
+  .glass-nav {
+    background-color: rgb(var(--glass-nav-bg));
+    backdrop-filter: blur(var(--glass-nav-blur)) saturate(var(--glass-nav-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-nav-blur)) saturate(var(--glass-nav-saturate));
+    border-bottom: 1px solid hsl(var(--color-neutral-stroke-1) / 0.4);
+    box-shadow: inset 0 1px 0 hsl(var(--color-neutral-foreground-1) / 0.06);
+  }
+  .glass-modal {
+    background-color: rgb(var(--glass-modal-bg));
+    backdrop-filter: blur(var(--glass-modal-blur)) saturate(var(--glass-modal-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-modal-blur)) saturate(var(--glass-modal-saturate));
+    border: 1px solid hsl(var(--color-neutral-foreground-1) / 0.12);
+    box-shadow:
+      inset 0 1px 0 hsl(var(--color-neutral-foreground-1) / 0.08),
+      0 18px 60px hsl(0 0% 0% / 0.28);
+  }
+  .glass-dropdown {
+    background-color: rgb(var(--glass-dropdown-bg));
+    backdrop-filter: blur(var(--glass-dropdown-blur)) saturate(var(--glass-dropdown-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-dropdown-blur)) saturate(var(--glass-dropdown-saturate));
+    border: 1px solid hsl(var(--color-neutral-foreground-1) / 0.08);
+  }
+
+  /* === Card surface (content cards, form containers, detail blocks) ===
+   * Lower alpha than nav/modal — content needs to read clearly,
+   * the gradient only shows through subtly. */
+  .glass-card {
+    background-color: hsl(var(--card) / 0.55);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid hsl(var(--color-neutral-foreground-1) / 0.08);
+  }
+  [data-theme="light"] .glass-card {
+    background-color: hsl(var(--card) / 0.72);
+    backdrop-filter: blur(16px) saturate(180%);
+    border-color: hsl(var(--color-neutral-foreground-1) / 0.06);
+  }
+
+  /* === Form input — sits inside glass-card ===
+   * More opaque than the surrounding card (0.82 vs card 0.55) so the
+   * field reads as a clear "carved-in" input rather than a smear.
+   * 8px backdrop-blur on top of the card's 12px gives a subtle
+   * "double frosted" focus without losing text contrast. */
+  .glass-input {
+    background-color: hsl(var(--background) / 0.82);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  [data-theme="light"] .glass-input {
+    background-color: hsl(var(--card) / 0.85);
+  }
+
+  /* Brand text color (orange) — using --color-brand-foreground-2 with HSL */
+  .text-brand { color: hsl(var(--color-brand-background)); }
+  .bg-brand { background-color: hsl(var(--color-brand-background)); }
+  .bg-brand-subtle { background-color: hsl(var(--color-brand-background-subtle)); }
+  .border-brand { border-color: hsl(var(--color-brand-background)); }
+
+  /* Eyebrow / uppercase label */
+  .eyebrow {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: hsl(var(--color-brand-background));
+  }
+
+  /* Soft tap target (min 44px on touch) */
+  .tap-target { min-height: var(--touch-target-min); min-width: var(--touch-target-min); }
+
+  /* === Deck tile backlight ===
+   * A soft glow under the deck tile, painted via:
+   *   1. `box-shadow` — GPU-composited, single paint layer. Ramps
+   *      on hover (composited, no layout cost).
+   *   2. `::after` `radial-gradient` — paint-only, static, no
+   *      `filter: blur()` (which is the typical perf trap for glow
+   *      effects and would force a continuous paint on hover).
+   *
+   * The accent color is supplied per-tile via inline
+   * `style={{ "--deck-accent": "..." }}` so the same class works
+   * for any deck theme color.
+   *
+   * `will-change: transform` primes the layer so the hover lift
+   * is a true compositor operation, not a paint trigger.
+   */
+  .tile-backlight {
+    position: relative;
+    isolation: isolate;
+    --deck-accent: 162 50% 58%;
+    box-shadow: 0 12px 32px -8px hsl(var(--deck-accent) / 0.35);
+    transition:
+      transform var(--duration-normal) var(--curve-easy-out),
+      box-shadow var(--duration-normal) var(--curve-easy-out);
+    will-change: transform;
+  }
+  .tile-backlight::after {
+    content: "";
+    position: absolute;
+    inset: auto -6px -10px -6px;
+    height: 28px;
+    background: radial-gradient(
+      ellipse 90% 100% at center,
+      hsl(var(--deck-accent) / 0.45),
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: -1;
+    /* `opacity` transition is composited (not paint) so the hover
+       ramp is cheap. */
+    opacity: 0.85;
+    transition: opacity var(--duration-normal) var(--curve-easy-out);
+  }
+  .tile-backlight:hover,
+  .tile-backlight:focus-visible {
+    transform: translateY(-2px);
+    box-shadow:
+      0 18px 48px -10px hsl(var(--deck-accent) / 0.55),
+      0 2px 8px hsl(var(--deck-accent) / 0.18);
+  }
+  .tile-backlight:hover::after,
+  .tile-backlight:focus-visible::after {
+    opacity: 1;
+  }
+
+  /* Phase 10 — section entrance stagger */
+  .animate-section-in {
+    animation: section-in var(--duration-slow) var(--curve-easy-out) both;
+  }
+  .animate-section-in-delay-1 { animation-delay: 80ms; }
+  .animate-section-in-delay-2 { animation-delay: 160ms; }
+}
+
+/* ============================================================
+ * FLUID TYPE — clamp() for hero h1 etc.
+ * ============================================================ */
+
+/* Slide-down animation for the batch-action toolbar.
+ * No animation library: pure keyframes, opt-in via inline style
+ * on the consumer. */
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* === PWA + Motion (Phase 10) === */
+@keyframes section-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@layer base {
+  .text-fluid-display {
+    font-size: clamp(36px, 6vw, 64px);
+    line-height: 1.05;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .text-fluid-h1 {
+    font-size: clamp(28px, 4.5vw, 48px);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .text-fluid-h2 {
+    font-size: clamp(22px, 3.5vw, 32px);
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+}
+
+/* ============================================================
+ * REDUCED TRANSPARENCY FALLBACK
+ * Users with `prefers-reduced-transparency: reduce` (often
+ * low-vision / dyslexia) cannot read text on translucent
+ * surfaces. Force solid backgrounds and disable backdrop-filter.
+ * ============================================================ */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-nav,
+  .glass-modal,
+  .glass-dropdown,
+  .glass-card {
+    background-color: hsl(var(--card) / 0.96);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  [data-theme="light"] .glass-nav,
+  [data-theme="light"] .glass-modal,
+  [data-theme="light"] .glass-dropdown,
+  [data-theme="light"] .glass-card {
+    background-color: hsl(var(--card));
+  }
+  .glass-input {
+    background-color: hsl(var(--card) / 0.96);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  body {
+    background: hsl(var(--background));
+  }
+  /* Hide the grain overlay too — some reduced-transparency users
+   * (low-vision) also find noise disorienting. */
+  body::before { display: none; }
+}

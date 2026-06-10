@@ -1,0 +1,287 @@
+// Prisma schema for ReMem-Reborn
+// Auth tables (D-01) + business table skeletons (D-01)
+// Migration strategy: prisma migrate dev (D-02)
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── Auth (NextAuth v5 + PrismaAdapter) ──────────────────
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  passwordHash  String? // bcryptjs hash; null for OAuth-only users (future)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts   Account[]
+  sessions   Session[]
+  decks      Deck[]
+  cardStates CardState[]
+  reviewLogs ReviewLog[]
+  studyPlans StudyPlan[]
+  noteTypes  NoteType[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Business skeletons (minimal for Phase 3+ extension) ─
+model Deck {
+  id             String   @id @default(cuid())
+  userId         String
+  title          String
+  description    String?
+  shuffleOptions Boolean  @default(true)
+  // HSL triplet (no `hsl()` wrapper) chosen by the user from the
+  // 8-color palette in `src/lib/deck-accent.ts`, or a custom color
+  // via the native `<input type="color">` picker in the deck
+  // settings page. When null, the deck list falls back to a
+  // hash-derived default from the same palette so every deck still
+  // has a stable theme color.
+  themeColor     String?
+  settingsMode   String   @default("simple")  // "simple" | "pro" (D-15)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards      Card[]
+  reviewLogs ReviewLog[]
+  studyPlan  StudyPlan?
+  noteType   NoteType?
+
+  @@index([userId])
+}
+
+model Card {
+  id            String   @id @default(cuid())
+  deckId        String
+  type          String   @default("qa") // 'choice' | 'multi_choice' | 'fill' | 'qa' | 'judge'
+  frontContent  String?
+  backContent   String?
+  typeData      Json?
+  isFavorite    Boolean  @default(false)
+  suspended     Boolean  @default(false)
+  shuffleOptOut Boolean  @default(false)
+  // Phase 08-02: per-card FSRS 6 learning progress (0-1 float).
+  // Computed by computeFsrs6Progress on every answerCard; clamped
+  // to [0, 1] in the lib. deck-level mean is exposed on /decks/[id].
+  progress      Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  deck       Deck        @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  cardState  CardState?
+  reviewLogs ReviewLog[]
+  fields     CardField[]
+
+  @@index([deckId])
+  @@index([deckId, type])
+  @@index([deckId, suspended])
+  // Phase 08-02: deck-level mean-progress aggregate uses this
+  // (mean(progress) where deckId=... AND suspended=false).
+  @@index([deckId, progress])
+}
+
+model CardState {
+  id            String    @id @default(cuid())
+  cardId        String    @unique
+  userId        String
+  stability     Float?
+  difficulty    Float?
+  elapsedDays   Int?
+  scheduledDays Int?
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
+  // Phase 08 fix: ts-fsrs tracks which learning/relearning step a
+  // card is on via `learning_steps`. v1 hard-coded this to 0 on every
+  // load, so a card in multi-step learning could NEVER graduate — it
+  // re-entered step 0 on each answer and oscillated in `learning`
+  // forever ("次次过完 / 算法无法生效"). Persisting it lets ts-fsrs
+  // advance the card through its steps and graduate to `review`.
+  learningSteps Int       @default(0)
+  // Phase 8 progress-v2 (2026-06-09): distinct calendar days this card has
+  // been studied. Gates the day-1 progress cap — studyDays <= 1 means "first
+  // day", hard-capped at 0.80; studyDays >= 2 unlocks the stability-mastery
+  // climb toward 1.0. Backfilled for existing cards (review/relearning -> 2).
+  studyDays     Int       @default(0)
+  // Phase 8 progress-v2: cumulative Again (fail) presses. Discounts the
+  // accumulated success score in the progress formula (bounded penalty,
+  // floored — never drives a learned card to 0). Backfilled from lapses.
+  failCount     Int       @default(0)
+  state         String    @default("new") // new | learning | review | relearning
+  lastReview    DateTime?
+  due           DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([due])
+}
+
+model ReviewLog {
+  id            String    @id @default(cuid())
+  cardId        String
+  deckId        String
+  userId        String
+  rating        Int
+  // Phase 06-01: undo snapshot. Stores the 9 CardState fields
+  // (stability / difficulty / elapsedDays / scheduledDays / reps /
+  // lapses / state / lastReview / due) at the time of this review, so
+  // revertLastAnswer() can restore the prior state on undo. null on
+  // the very first review of a brand-new card (no prior CardState).
+  previousState Json?
+  // Phase 06-01: soft-delete marker for undo. null = log is live
+  // (counts toward stats). non-null = log was undone at this time
+  // (preserved for audit trail / STATS-01 history; excluded from
+  // "latest non-undone" lookup).
+  undoneAt      DateTime?
+  reviewedAt    DateTime  @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, reviewedAt])
+  @@index([deckId])
+  // Phase 06-01: serves revertLastAnswer()'s hot query
+  // `findFirst({ where: { cardId, undoneAt: null }, orderBy: { reviewedAt: "desc" } })`.
+  @@index([cardId, undoneAt])
+}
+
+model StudyPlan {
+  id            String   @id @default(cuid())
+  deckId        String   @unique
+  userId        String
+  newPerDay     Int      @default(20)
+  reviewsPerDay Int      @default(200)
+  // Phase 08-01: FSRS 6 scheduler knobs. Phase 8 stores them via
+  // the Study Plan form but does not yet pass them to the live
+  // FSRS scheduler (buildQueue still only reads newPerDay +
+  // reviewsPerDay for the cap). Phase 9+ threads them through.
+  // requestRetention 0<r<=1 (FSRS 4.5+); ts-fsrs default 0.9.
+  requestRetention Float    @default(0.9)
+  // Fuzz adds a small random jitter to intervals so cards at the
+  // same stability bucket don't all land on the same day. ts-fsrs
+  // default is false; we ship true for smoother daily queues.
+  enableFuzz       Boolean  @default(true)
+  // Short-term applies the 1m/10m (re)learning step schedule.
+  // ts-fsrs default true; matches user expectations.
+  enableShortTerm  Boolean  @default(true)
+  // Phase 08-04: "first-session target progress" threshold.
+  // When a card's FSRS 6 progress (Card.progress, written by
+  // answerCard in the same transaction) reaches this value, the
+  // buildQueue re-buckets the card from "new" to "review" — it
+  // counts toward the user's daily review cap instead of their
+  // new-card cap, so well-learned cards get the right scheduling
+  // pressure. 0.80 is the FSRS 6 default; users with denser
+  // decks typically leave it at the default.
+  firstSessionTargetProgress Float @default(0.80)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model NoteType {
+  id        String   @id @default(cuid())
+  deckId    String   @unique
+  userId    String
+  name      String
+  config    String   @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deck      Deck           @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fields    Field[]
+  templates CardTemplate[]
+
+  @@index([userId])
+}
+
+model Field {
+  id         String   @id @default(cuid())
+  noteTypeId String
+  name       String
+  ord        Int
+  createdAt  DateTime @default(now())
+
+  noteType NoteType    @relation(fields: [noteTypeId], references: [id], onDelete: Cascade)
+  cards    CardField[]
+
+  @@index([noteTypeId])
+}
+
+model CardTemplate {
+  id         String   @id @default(cuid())
+  noteTypeId String
+  name       String
+  ord        Int
+  qfmt       String
+  afmt       String
+  createdAt  DateTime @default(now())
+
+  noteType NoteType @relation(fields: [noteTypeId], references: [id], onDelete: Cascade)
+
+  @@index([noteTypeId])
+}
+
+model CardField {
+  id      String @id @default(cuid())
+  cardId  String
+  fieldId String
+  value   String @default("")
+
+  card  Card  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  field Field @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, fieldId])
+}
