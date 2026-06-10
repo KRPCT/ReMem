@@ -8,6 +8,7 @@
 <p align="center">多题型练习 · Anki 风格模板 · 学习统计 · 可安装为 PWA · 单服务器自托管</p>
 
 <p align="center">
+  <a href="https://remem-demo.vercel.app"><img alt="Live Demo" src="https://img.shields.io/badge/live%20demo-online-3b8774?style=flat-square"></a>
   <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js">
   <img alt="React 19" src="https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white">
   <img alt="Prisma + SQLite" src="https://img.shields.io/badge/Prisma%206-SQLite-2D3748?style=flat-square&logo=prisma&logoColor=white">
@@ -23,6 +24,10 @@
   <a href="#项目结构">项目结构</a> ·
   <a href="#赞助">赞助</a> ·
   <a href="#license">License</a>
+</p>
+
+<p align="center">
+  <a href="https://remem-demo.vercel.app"><b>在线体验 Demo</b></a> · 演示账号 <code>demo@remem.app</code> / <code>remem-demo-2026</code>
 </p>
 
 ---
