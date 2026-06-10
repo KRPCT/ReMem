@@ -10,7 +10,10 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "seed:demo": "node prisma/seed-demo.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "2.11.2",
@@ -71,6 +74,14 @@
   },
   "packageManager": "pnpm@10.33.2",
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ],
     "overrides": {
       "@codemirror/state": "6.6.0",
       "@codemirror/view": "6.43.0",

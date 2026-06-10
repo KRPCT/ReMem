@@ -1,10 +1,11 @@
-// Prisma schema for ReMem-Reborn
-// Auth tables (D-01) + business table skeletons (D-01)
-// Migration strategy: prisma migrate dev (D-02)
+// Prisma schema for ReMem (demo branch: Supabase Postgres).
+// Models are identical to main; only the datasource provider differs.
+// Demo DB lifecycle: `prisma db push` against Supabase (no migrations dir).
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled (PgBouncer 6543) for runtime
+  directUrl = env("DIRECT_URL")   // direct (5432) for db push / migrations
 }
 
 generator client {

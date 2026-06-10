@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // demo branch: skip ESLint during the Vercel build. Lint stays enforced on
+  // main via `pnpm lint`; here it only flakes on fresh strict-pnpm installs
+  // (eslint-plugin-react-hooks not hoisted) and must never block a deploy.
+  eslint: { ignoreDuringBuilds: true },
   experimental: {
     // Disable client-side router cache for dynamic routes. The 30s default
     // (Next.js 15) was masking Server Action revalidations: after creating
