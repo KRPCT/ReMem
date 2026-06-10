@@ -89,14 +89,16 @@ describe("answerCardAction", () => {
   });
 
   it("returns { error } when the card is not owned by the caller", async () => {
+    // After removing the assertCardOwner pre-check, the ownership miss
+    // surfaces from answerCard()'s $transaction throwing. The pre-check
+    // is gone -- answerCard IS called and is what produces the error.
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    mockCardFindFirst.mockResolvedValue(null);
+    mockAnswer.mockRejectedValue(new Error("卡片不存在或无权访问"));
     const res = await answerCardAction(
       null,
       mkFd({ cardId: "c1", rating: "3", deckId: "d1" })
     );
     expect(res).toEqual({ error: "卡片不存在或无权访问" });
-    expect(mockAnswer).not.toHaveBeenCalled();
   });
 
   it("happy path: returns { ok: true, newState: 10 fields, requeueInSession } and does NOT revalidate the study route", async () => {
@@ -194,6 +196,22 @@ describe("answerCardAction", () => {
       mkFd({ cardId: "c1", rating: "3", deckId: "d1" })
     );
     expect(res).toEqual({ error: "卡片不存在或无权访问" });
+  });
+
+  it("regression (PERF-01): answerCardAction never calls revalidatePath", async () => {
+    // Named standalone guard: the no-revalidate contract must hold before
+    // AND after the 13-02 assertCardOwner redundancy removal. This test is
+    // written here (Wave 0) so Wave 1 cannot silently re-introduce revalidate.
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockCardFindFirst.mockResolvedValue({ id: "c1", deckId: "d1" });
+    mockAnswer.mockResolvedValue({
+      state: FAKE_STATE,
+      progress: 0.5,
+      graduated: false,
+      requeueInSession: false,
+    });
+    await answerCardAction(null, mkFd({ cardId: "c1", rating: "3", deckId: "d1" }));
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 });
 

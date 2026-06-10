@@ -9,7 +9,7 @@ import {
   type CardTypeData,
 } from "@/lib/validation";
 import { CardTypeBadge } from "./card-type-badge";
-import { MarkdownRenderer } from "@/components/markdown/markdown-renderer";
+import { MarkdownRendererLazy } from "@/components/markdown/markdown-renderer-lazy";
 import { renderOptionPlaceholders } from "@/lib/render-option-placeholders";
 
 /**
@@ -196,7 +196,7 @@ function Question({ children }: { children: React.ReactNode }) {
           mermaid work; JSX content (choice/fill) keeps literal whitespace. */}
       {typeof children === "string" ? (
         <div className="text-sm leading-relaxed">
-          <MarkdownRenderer content={children} />
+          <MarkdownRendererLazy content={children} />
         </div>
       ) : (
         <div className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -219,7 +219,7 @@ function AnswerPanel({ children }: { children: React.ReactNode }) {
       </p>
       {typeof children === "string" ? (
         <div className="text-sm leading-relaxed">
-          <MarkdownRenderer content={children} />
+          <MarkdownRendererLazy content={children} />
         </div>
       ) : (
         <div className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -507,7 +507,7 @@ function MarkdownInline({ content }: { content: string }) {
   // (the default block <p> from MarkdownRenderer forces line breaks — the cause
   // of the "weird line breaks" around fill blanks). $KaTeX$ still renders.
   return (
-    <MarkdownRenderer
+    <MarkdownRendererLazy
       content={content}
       className="inline [&_p]:m-0 [&_p]:inline"
     />
@@ -782,11 +782,15 @@ export function CardBody({
   const effectiveShowAnswer = interactive
     ? showAnswer || judgment !== null
     : showAnswer;
-  // For interactive mode, the "correct" highlight is shown
-  // unconditionally after the user has judged (regardless of
-  // showAnswer), so the user always sees the right answer.
+  // For interactive mode, the "correct" highlight is shown once the
+  // user has judged OR once they explicitly hit "显示答案" (showAnswer).
+  // Without the `|| showAnswer` clause, revealing a choice/multi/judge
+  // card WITHOUT first picking left every option neutral -- the correct
+  // answer never surfaced ("点击显示答案不会显示具体选项"). qa/fill
+  // revealed fine because they key off effectiveShowAnswer, so the bug
+  // only bit the option-based types.
   const showCorrectHighlight = interactive
-    ? judgment !== null
+    ? judgment !== null || showAnswer
     : showAnswer;
 
   return (
@@ -914,9 +918,6 @@ export function CardBody({
                 aria-label="提交多选答案"
               >
                 提交答案
-                <span className="font-mono text-[10px] opacity-60">
-                  {multiPicks.length} / {multiAnswerSet?.size ?? 0}
-                </span>
               </button>
             </div>
           ) : null}

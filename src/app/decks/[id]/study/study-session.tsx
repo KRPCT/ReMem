@@ -334,62 +334,98 @@ export function StudySession({
     // Reset any previous judgment for the next card.
     setJudgment(null);
 
-    const cardId = current.cardId;
+    // Capture pre-advance snapshot for rollback and correct requeue
+    // positioning (the queue mutates during the transition, so we must
+    // freeze these values before any state update).
+    const capturedCardId = current.cardId;
+    const capturedIndex = index;
+    const capturedQueueLen = queue.length;
+
     const fd = new FormData();
-    fd.set("cardId", cardId);
+    fd.set("cardId", capturedCardId);
     fd.set("rating", String(rating));
 
+    // Optimistic advance runs SYNCHRONOUSLY here (NOT inside
+    // startTransition). The next card paints in the same tick AND its
+    // 显示答案 / rating controls are immediately interactive. Previously
+    // these updates lived inside the same transition as the server call,
+    // so the single shared `isPending` stayed true through this card's
+    // await -- which disabled the NEXT card's buttons until the previous
+    // server write returned (在 dev 模式 JIT 重编译下长达 1-3s). That was
+    // the "答案显示要多点好几次 / 自评卡顿" stutter. The `!revealed`
+    // guard above flips off the moment we setRevealed(false), closing the
+    // same-card double-submit window.
+    setRevealed(false);
+    setRevealKey((k) => k + 1);
+    setLastAnsweredCardId(capturedCardId);
+    setReviewed((n) => n + 1);
+    setIndex((i) => i + 1);
+
     startTransition(async () => {
+      // The server write runs in the background. We deliberately do NOT
+      // let its isPending gate the next card (see the optimistic block
+      // above).
       const result = await answerCardAction(null, fd);
+
       if (!result || result.error) {
-        setError(result?.error ?? "未知错误");
+        // Rollback the optimistic advance for this card. Undo every
+        // counter the advance bumped (reviewed) and only clear the undo
+        // pointer if it still refers to THIS card (a later successful
+        // rating may have moved it). Rewind index + re-reveal so the
+        // failed card comes back for another try.
+        setError(result?.error ?? "评分失败,请重试");
+        setIndex((i) => Math.max(0, i - 1));
+        setRevealed(true);
+        setReviewed((n) => Math.max(0, n - 1));
+        setLastAnsweredCardId((id) => (id === capturedCardId ? null : id));
         return;
       }
+
       // Phase 08-02: mirror the freshly-written Card.progress
       // (returned in newState) so the top-of-card hairline bar
       // reflects the post-answer value without a round-trip.
       const newProgress = result.newState?.progress;
       if (typeof newProgress === "number") {
-        setProgressByCard((prev) => ({ ...prev, [cardId]: newProgress }));
+        setProgressByCard((prev) => ({
+          ...prev,
+          [capturedCardId]: newProgress,
+        }));
       }
-      // 成功 -> 记录最近一次评分,供撤回按钮使用
-      setLastAnsweredCardId(cardId);
-      setReviewed((n) => n + 1);
 
       // Phase 8 (re-exec): the scheduling strategy tells us (via
       // `requeueInSession`) whether this answer reached the first-session
-      // threshold. If NOT — and the card is under its per-card re-queue
-      // cap — splice a copy back into the queue at a random later slot so
-      // the user re-tests it before the session ends (FSRS still owns the
-      // cross-session due date). If it DID graduate (or hit the cap), the
-      // card is done — count it toward mastery.
-      const requeueCount = requeueCounts[cardId] ?? 0;
+      // threshold. Use the PRE-ADVANCE snapshot for the requeue splice
+      // position so the card lands at the correct later slot even though
+      // index has already incremented (Pitfall 2).
+      const requeueCount = requeueCounts[capturedCardId] ?? 0;
       const willRequeue =
         result.requeueInSession === true &&
         requeueCount < REQUEUE_MAX_PER_CARD;
 
       if (willRequeue) {
-        setRequeueCounts((m) => ({ ...m, [cardId]: requeueCount + 1 }));
+        setRequeueCounts((m) => ({
+          ...m,
+          [capturedCardId]: requeueCount + 1,
+        }));
         setQueue((q) => {
-          const at = requeuePosition(index, q.length, Math.random);
+          const at = requeuePosition(capturedIndex, capturedQueueLen, Math.random);
           const next = q.slice();
-          // Re-insert the SAME card object; its live progress is read
-          // from `progressByCard[cardId]`, so the re-test shows the
-          // updated bar.
-          next.splice(at, 0, q[index]);
+          // Re-insert the card from the pre-advance snapshot position.
+          // q[capturedIndex] is still the same card object (queue items
+          // are stable references; only index advanced, not the array).
+          next.splice(at, 0, q[capturedIndex]);
           return next;
         });
       } else {
         setFinishedCards((s) => {
           const next = new Set(s);
-          next.add(cardId);
+          next.add(capturedCardId);
           return next;
         });
       }
-
-      setIndex((i) => i + 1);
-      setRevealed(false);
-      setRevealKey((k) => k + 1);
+      // NOTE: setIndex / setRevealed / setRevealKey are NOT called here.
+      // They already ran in the optimistic advance above -- a second call
+      // would double-advance or re-hide a card that was already hidden.
     });
   }
 
@@ -597,7 +633,6 @@ export function StudySession({
                 type="button"
                 size="lg"
                 onClick={handleReveal}
-                disabled={isPending}
                 className="w-full sm:w-auto active:scale-[0.97] transition-transform duration-[150ms]"
               >
                 显示答案
@@ -628,7 +663,6 @@ export function StudySession({
               label="重来"
               shortKey="1"
               tone="destructive"
-              disabled={isPending}
               onClick={() => handleRate(1)}
             />
             {judgment && !judgment.correct ? null : (
@@ -638,7 +672,6 @@ export function StudySession({
                   label="困难"
                   shortKey="2"
                   tone="warning"
-                  disabled={isPending}
                   onClick={() => handleRate(2)}
                 />
                 <RatingButton
@@ -646,7 +679,6 @@ export function StudySession({
                   label="良好"
                   shortKey="3"
                   tone="brand"
-                  disabled={isPending}
                   onClick={() => handleRate(3)}
                 />
                 <RatingButton
@@ -654,7 +686,6 @@ export function StudySession({
                   label="简单"
                   shortKey="4"
                   tone="muted"
-                  disabled={isPending}
                   onClick={() => handleRate(4)}
                 />
               </>
@@ -696,7 +727,15 @@ interface RatingButtonProps {
   label: string;
   shortKey: string;
   tone: "destructive" | "warning" | "brand" | "muted";
-  disabled: boolean;
+  /**
+   * Optional. The rating buttons are no longer gated on the session's
+   * shared `isPending` (that gating disabled the NEXT card while the
+   * PREVIOUS card's answer was still in flight -- the post-optimistic-
+   * advance stutter). Each rating only renders for the current revealed
+   * card, and `handleRate`'s `!revealed` guard prevents same-card
+   * double-submit, so a disabled state is unnecessary here.
+   */
+  disabled?: boolean;
   onClick: () => void;
 }
 

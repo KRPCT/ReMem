@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ProgressBar } from "@/components/ui/progress";
 import { ProgressBadge } from "@/components/ui/progress-badge";
 import { ZhCaption } from "@/components/typography/zh-caption";
-import { MarkdownRenderer } from "@/components/markdown/markdown-renderer";
+import { MarkdownRendererLazy } from "@/components/markdown/markdown-renderer-lazy";
 import {
   cardTypeDataSchema,
   type CardType,
@@ -177,7 +177,7 @@ export default async function CardDetailPage({ params }: CardDetailPageProps) {
       {card.frontContent ? (
         <Card>
           <CardContent className="p-6">
-            <MarkdownRenderer content={card.frontContent} />
+            <MarkdownRendererLazy content={card.frontContent} />
           </CardContent>
         </Card>
       ) : null}
@@ -189,7 +189,7 @@ export default async function CardDetailPage({ params }: CardDetailPageProps) {
       {card.backContent ? (
         <Card>
           <CardContent className="p-6">
-            <MarkdownRenderer content={card.backContent} />
+            <MarkdownRendererLazy content={card.backContent} />
           </CardContent>
         </Card>
       ) : null}

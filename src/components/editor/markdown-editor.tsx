@@ -23,7 +23,7 @@ import {
   PencilLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MarkdownRenderer } from "@/components/markdown/markdown-renderer";
+import { MarkdownRendererLazy } from "@/components/markdown/markdown-renderer-lazy";
 import { cn } from "@/lib/utils";
 
 export interface MarkdownEditorProps {
@@ -478,7 +478,7 @@ export const MarkdownEditor = forwardRef<
               预览将在你输入时显示...
             </p>
           ) : (
-            <MarkdownRenderer content={deferredValue} />
+            <MarkdownRendererLazy content={deferredValue} />
           )}
         </div>
       </div>

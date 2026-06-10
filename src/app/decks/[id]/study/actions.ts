@@ -103,14 +103,13 @@ export async function answerCardAction(
     return { fieldErrors };
   }
 
-  // Ownership check (defense in depth) — we don't need the deckId here
-  // since this action intentionally does not revalidate (see below).
-  try {
-    await assertCardOwner(parsed.data.cardId, session.user.id);
-  } catch {
-    return { error: "卡片不存在或无权访问" };
-  }
-
+  // Ownership is enforced inside answerCard()'s $transaction via
+  // tx.card.findFirst({ where: { id, deck: { userId } } }), which throws
+  // "卡片不存在或无权访问" on a miss — caught by the outer try/catch below
+  // and returned as { error }. The pre-check assertCardOwner call was
+  // redundant: it ran the same ownership query one extra time before
+  // the transaction re-ran it anyway. Removing it cuts two DB round-trips
+  // to one with no change in security posture (ASVS V4 gate intact).
   try {
     const answer = await answerCard({
       cardId: parsed.data.cardId,

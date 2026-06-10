@@ -11,8 +11,8 @@ import { buildQueue, STUDY_PLAN_DEFAULTS } from "@/lib/fsrs";
 import { CardList } from "./cards/card-list";
 import { CardGallery } from "./cards/card-gallery";
 import { bucketCardStates, sampleRetention } from "@/lib/stats";
-import { DonutChart } from "@/components/stats/donut-chart";
-import { RetentionCurve } from "@/components/stats/retention-curve";
+import { DonutChartLazy } from "@/components/stats/donut-chart-lazy";
+import { RetentionCurveLazy } from "@/components/stats/retention-curve-lazy";
 
 interface DeckDetailPageProps {
   params: Promise<{ id: string }>;
@@ -221,8 +221,8 @@ export default async function DeckDetailPage({
       <section className="space-y-l">
         <ZhTitle zh="学习统计" en="DECK STATISTICS" size="h2" as="h2" />
         <div className="grid gap-l md:grid-cols-2">
-          <DonutChart distribution={deckDistribution} deckId={deck.id} />
-          <RetentionCurve data={deckRetention} avgStability={deckAvgStability} />
+          <DonutChartLazy distribution={deckDistribution} deckId={deck.id} />
+          <RetentionCurveLazy data={deckRetention} avgStability={deckAvgStability} />
         </div>
       </section>
 

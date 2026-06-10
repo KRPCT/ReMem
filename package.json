@@ -51,6 +51,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.2.0",
+    "@next/bundle-analyzer": "15.5.19",
     "@testing-library/jest-dom": "6.6.3",
     "@testing-library/react": "16.1.0",
     "@types/bcryptjs": "2.4.6",

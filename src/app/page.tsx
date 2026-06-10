@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getReviewHeatmap, sampleRetention } from "@/lib/stats";
 import type { HeatmapDay, RetentionPoint } from "@/lib/stats";
 import { ReviewHeatmap } from "@/components/stats/heatmap";
-import { RetentionCurve } from "@/components/stats/retention-curve";
+import { RetentionCurveLazy } from "@/components/stats/retention-curve-lazy";
 import { Button } from "@/components/ui/button";
 import { ZhTitle } from "@/components/typography/zh-title";
 
@@ -87,7 +87,7 @@ export default async function HomePage() {
           <ZhTitle zh="学习统计" en="STUDY STATISTICS" size="h2" as="h2" />
           <div className="mt-6 grid gap-xxl">
             <ReviewHeatmap data={heatmapData} />
-            <RetentionCurve
+            <RetentionCurveLazy
               data={globalRetention}
               avgStability={globalAvgStability}
             />
