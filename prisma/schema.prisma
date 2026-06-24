@@ -212,6 +212,14 @@ model StudyPlan {
   // Short-term applies the 1m/10m (re)learning step schedule.
   // ts-fsrs default true; matches user expectations.
   enableShortTerm  Boolean  @default(true)
+  // Phase 14: number of rating buttons shown in study (2 | 3 | 4). Collapses
+  // the FSRS grade scale at the UI layer only (2 = 不记得/记得, 3 = 重来/良好/
+  // 简单, 4 = full). The scheduler still receives a 1..4 grade; this changes
+  // which buttons render and which grade each button emits.
+  ratingButtons     Int      @default(4)
+  // Phase 14: when true, a NEW card's "记得/良好" (Good) press is graded as
+  // Easy, lengthening the first interval ("新学时记得视作简单").
+  newRememberAsEasy Boolean  @default(false)
   // Phase 08-04: "first-session target progress" threshold.
   // When a card's FSRS 6 progress (Card.progress, written by
   // answerCard in the same transaction) reaches this value, the

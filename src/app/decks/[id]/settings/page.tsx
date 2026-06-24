@@ -61,6 +61,8 @@ export default async function DeckSettingsPage({
         enableFuzz: studyPlan.enableFuzz,
         enableShortTerm: studyPlan.enableShortTerm,
         firstSessionTargetProgress: studyPlan.firstSessionTargetProgress,
+        ratingButtons: studyPlan.ratingButtons,
+        newRememberAsEasy: studyPlan.newRememberAsEasy,
       }
     : {
         ...STUDY_PLAN_DEFAULTS,
@@ -68,6 +70,8 @@ export default async function DeckSettingsPage({
         enableFuzz: true,
         enableShortTerm: true,
         firstSessionTargetProgress: 0.8,
+        ratingButtons: 4,
+        newRememberAsEasy: false,
       };
 
   return (

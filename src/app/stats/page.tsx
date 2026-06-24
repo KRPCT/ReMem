@@ -1,7 +1,12 @@
 import { requireUserId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { getReviewHeatmap, sampleRetention } from "@/lib/stats";
-import type { HeatmapDay, RetentionPoint } from "@/lib/stats";
+import {
+  adaptiveRetentionSpan,
+  getReviewHeatmap,
+  sampleEnsembleRetention,
+  sampleMaintainedRetention,
+} from "@/lib/stats";
+import type { HeatmapDay } from "@/lib/stats";
 import { ReviewHeatmap } from "@/components/stats/heatmap";
 import { RetentionCurveLazy } from "@/components/stats/retention-curve-lazy";
 import { ZhTitle } from "@/components/typography/zh-title";
@@ -25,7 +30,12 @@ export default async function StatsPage() {
     stabilities.length === 0
       ? null
       : stabilities.reduce((acc, v) => acc + v, 0) / stabilities.length;
-  const globalRetention: RetentionPoint[] = sampleRetention(globalAvgStability ?? 0);
+  const globalSpan = adaptiveRetentionSpan(globalAvgStability);
+  const globalForgetting = sampleEnsembleRetention(stabilities, globalSpan);
+  const globalMaintained = sampleMaintainedRetention(
+    globalAvgStability ?? 0,
+    globalSpan
+  );
 
   return (
     <main className="mx-auto max-w-content px-4 pb-20 pt-12 md:px-8 md:pt-20">
@@ -35,7 +45,12 @@ export default async function StatsPage() {
       </div>
       <div className="grid gap-xxl animate-section-in">
         <ReviewHeatmap data={heatmapData} />
-        <RetentionCurveLazy data={globalRetention} avgStability={globalAvgStability} />
+        <RetentionCurveLazy
+          forgetting={globalForgetting}
+          maintained={globalMaintained}
+          avgStability={globalAvgStability}
+          spanDays={globalSpan}
+        />
       </div>
     </main>
   );

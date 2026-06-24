@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useTransition, type ChangeEvent } from "react";
+import {
+  useRef,
+  useState,
+  useTransition,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type DragEvent,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CARD_TYPES } from "@/lib/validation";
+import { fileToDataUri } from "@/lib/image-data-uri";
 import {
   parseImportAction,
   confirmImportAction,
@@ -119,6 +127,7 @@ export function ImportCardsForm({ deckId }: { deckId: string }) {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleTypeChange = (v: ImportType) => {
     setCardType(v);
@@ -177,6 +186,47 @@ export function ImportCardsForm({ deckId }: { deckId: string }) {
         setSuccessMsg(null);
       })
       .catch(() => setParseResult({ error: "读取文件失败" }));
+  };
+
+  // Paste or drop an image into the content box -> inline it as a base64
+  // data-URI (![](data:...)). Demo-safe: no server upload (the Vercel demo FS
+  // is read-only), the bytes travel inside the card markdown itself.
+  const handleImageFiles = (files: File[]) => {
+    const images = files.filter((f) => f.type.startsWith("image/"));
+    if (images.length === 0) return;
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? start;
+    Promise.all(images.map(fileToDataUri))
+      .then((uris) => {
+        const snippet = uris
+          .map((uri, i) => `\n![${images[i].name}](${uri})\n`)
+          .join("");
+        setText((prev) => prev.slice(0, start) + snippet + prev.slice(end));
+        setParseResult(null);
+        setSuccessMsg(null);
+      })
+      .catch((err) =>
+        setParseResult({
+          error: err instanceof Error ? err.message : "图片插入失败",
+        })
+      );
+  };
+
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (files.some((f) => f.type.startsWith("image/"))) {
+      e.preventDefault();
+      handleImageFiles(files);
+    }
+  };
+
+  const handleDrop = (e: DragEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (files.some((f) => f.type.startsWith("image/"))) {
+      e.preventDefault();
+      handleImageFiles(files);
+    }
   };
 
   const topError =
@@ -249,15 +299,19 @@ export function ImportCardsForm({ deckId }: { deckId: string }) {
       <div className="space-y-1">
         <Label htmlFor="import-text">内容预览 / 手动编辑</Label>
         <Textarea
+          ref={textareaRef}
           id="import-text"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onPaste={handlePaste}
+          onDrop={handleDrop}
           placeholder={TYPE_PLACEHOLDER[cardType]}
           className="min-h-[180px] font-mono text-sm"
         />
         <p className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
           多张卡片用 === 分隔；正反面用 --- 分隔，可混排自动识别。选择/多选题用
-          A./B. 列选项，再单独一行写 答案: A（多选 答案: A、C）。
+          A./B. 列选项，再单独一行写 答案: A（多选 答案: A、C）。可直接粘贴或拖拽图片，
+          自动以 base64 内联（单张上限 2MB，支持 PNG / JPG / GIF / WebP）。
         </p>
       </div>
 

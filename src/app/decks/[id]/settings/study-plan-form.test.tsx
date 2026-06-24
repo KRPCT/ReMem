@@ -48,6 +48,9 @@ const INITIAL = {
   enableShortTerm: false,
   // Phase 08-04: 6th field on the Study Plan form.
   firstSessionTargetProgress: 0.5,
+  // Phase 14: rating-bar collapse + new-card remember-as-easy.
+  ratingButtons: 4,
+  newRememberAsEasy: false,
 };
 
 function renderForm() {

@@ -1,14 +1,19 @@
 "use client";
 
 /**
- * Phase 09 (STATS-02): FSRS memory-retention curve (Recharts AreaChart).
+ * Phase 09 / Phase 14 redesign: FSRS memory curve, two-narrative contrast.
  *
- * Series colors are resolved from the design-token CSS variables at runtime
- * via getComputedStyle (UI-SPEC § Chart Series Color Contract) and passed to
- * Recharts as concrete `hsl(...)` strings, because the project has no shadcn
- * color Tailwind mapping and SVG presentation attributes do not resolve `var()`.
- * A MutationObserver re-reads them on theme switch. Recharts animation is
- * disabled under prefers-reduced-motion. No em-dash in any visible string.
+ * GREEN  ("坚持复习")  — sampleMaintainedRetention: an illustrative sawtooth that
+ *   snaps back to 100% on every on-schedule review and holds high.
+ * RED    ("不复习")    — sampleEnsembleRetention: the population expected recall
+ *   if reviewing stops now, decaying toward 0.
+ *
+ * Series colors are resolved from the design-token CSS variables at runtime via
+ * getComputedStyle (UI-SPEC Chart Series Color Contract) and passed to Recharts
+ * as concrete `hsl(...)` strings, because the project has no shadcn color
+ * Tailwind mapping and SVG presentation attributes do not resolve `var()`. A
+ * MutationObserver re-reads them on theme switch. Recharts animation is disabled
+ * under prefers-reduced-motion. No em-dash in any visible string.
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -24,9 +29,14 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ZhCaption } from "@/components/typography/zh-caption";
-import type { RetentionPoint } from "@/lib/stats";
+import { REVIEW_TARGET_RETENTION, type RetentionPoint } from "@/lib/stats";
 
-const FALLBACK = { brand: "162 45% 58%", fg3: "240 5% 56%", fg4: "240 5% 43%" };
+const FALLBACK = {
+  brand: "162 45% 58%",
+  destructive: "0 72% 51%",
+  fg3: "240 5% 56%",
+  fg4: "240 5% 43%",
+};
 
 function readVar(name: string, fallback: string): string {
   if (typeof window === "undefined") return fallback;
@@ -39,39 +49,65 @@ function readVar(name: string, fallback: string): string {
 function readTokens() {
   return {
     brand: readVar("--color-brand-background", FALLBACK.brand),
+    destructive: readVar("--destructive", FALLBACK.destructive),
     fg3: readVar("--color-neutral-foreground-3", FALLBACK.fg3),
     fg4: readVar("--color-neutral-foreground-4", FALLBACK.fg4),
   };
 }
 
+interface MergedPoint {
+  day: number;
+  maintained: number | null;
+  forgetting: number | null;
+}
+
 interface CurveTooltipProps {
   active?: boolean;
-  payload?: Array<{ payload: RetentionPoint }>;
+  payload?: Array<{ payload: MergedPoint }>;
 }
 
 function CurveTooltip({ active, payload }: CurveTooltipProps) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
+  const pct = (v: number | null) => (v == null ? "-" : `${(v * 100).toFixed(0)}%`);
   return (
     <div
-      className="rounded-md border px-2.5 py-1 text-sm font-medium shadow-md"
+      className="space-y-0.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-md"
       style={{
         backgroundColor: "hsl(var(--card))",
         color: "hsl(var(--foreground))",
         borderColor: "hsl(var(--border))",
       }}
     >
-      {p.day}天后: {(p.retention * 100).toFixed(1)}%
+      <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        {p.day === 0 ? "新学" : `${p.day} 天后`}
+      </div>
+      <div style={{ color: "hsl(var(--color-brand-background))" }}>
+        坚持复习 {pct(p.maintained)}
+      </div>
+      <div style={{ color: "hsl(var(--destructive))" }}>
+        不复习 {pct(p.forgetting)}
+      </div>
     </div>
   );
 }
 
 export interface RetentionCurveProps {
-  data: RetentionPoint[];
+  /** Red baseline: population expected recall if reviewing stops now. */
+  forgetting: RetentionPoint[];
+  /** Green overlay: illustrative maintained-by-reviews sawtooth. */
+  maintained: RetentionPoint[];
   avgStability: number | null;
+  /** Adaptive x-axis max (days). */
+  spanDays: number;
 }
 
-export function RetentionCurve({ data, avgStability }: RetentionCurveProps) {
+export function RetentionCurve({
+  forgetting,
+  maintained,
+  avgStability,
+  spanDays,
+}: RetentionCurveProps) {
   const [tokens, setTokens] = useState(readTokens);
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -93,17 +129,28 @@ export function RetentionCurve({ data, avgStability }: RetentionCurveProps) {
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  const isEmpty = data.length === 0 || avgStability == null || avgStability <= 0;
+  const isEmpty =
+    forgetting.length === 0 || avgStability == null || avgStability <= 0;
 
-  const stroke = `hsl(${tokens.brand})`;
-  const fill = `hsl(${tokens.brand} / 0.15)`;
+  // Merge the two same-length series into one Recharts data array.
+  const merged: MergedPoint[] = forgetting.map((f, i) => ({
+    day: f.day,
+    forgetting: f.retention,
+    maintained: maintained[i]?.retention ?? null,
+  }));
+
+  const span = Math.max(1, spanDays);
+  const ticks = Array.from({ length: 7 }, (_, i) => Math.round((i * span) / 6));
+
+  const green = `hsl(${tokens.brand})`;
+  const red = `hsl(${tokens.destructive})`;
   const axis = `hsl(${tokens.fg3})`;
   const refLine = `hsl(${tokens.fg4})`;
 
   return (
-    <Card>
-      <CardContent className="space-y-l p-6">
-        <ZhCaption zh="记忆留存曲线" en="RETENTION CURVE" />
+    <Card className="min-w-0">
+      <CardContent className="min-w-0 space-y-l p-6">
+        <ZhCaption zh="记忆曲线" en="MEMORY CURVE" />
 
         {isEmpty ? (
           <div
@@ -120,25 +167,47 @@ export function RetentionCurve({ data, avgStability }: RetentionCurveProps) {
           </div>
         ) : (
           <>
-            <ResponsiveContainer width="100%" height={180}>
+            {/* legend */}
+            <div className="flex flex-wrap items-center gap-x-l gap-y-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: green }}
+                />
+                坚持复习
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: red }}
+                />
+                不复习
+              </span>
+            </div>
+
+            <ResponsiveContainer width="100%" height={200}>
               <AreaChart
-                data={data}
+                data={merged}
                 margin={{ top: 8, right: 12, bottom: 4, left: 0 }}
               >
+                <defs>
+                  <linearGradient id="curveGreen" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={green} stopOpacity={0.22} />
+                    <stop offset="100%" stopColor={green} stopOpacity={0.02} />
+                  </linearGradient>
+                  <linearGradient id="curveRed" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={red} stopOpacity={0.18} />
+                    <stop offset="100%" stopColor={red} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
                 <XAxis
                   dataKey="day"
                   type="number"
-                  domain={[0, 60]}
-                  ticks={[0, 10, 20, 30, 40, 50, 60]}
+                  domain={[0, span]}
+                  ticks={ticks}
                   tick={{ fill: axis, fontSize: 11 }}
                   stroke={axis}
-                  label={{
-                    value: "天数 (days)",
-                    position: "insideBottom",
-                    offset: -2,
-                    fontSize: 11,
-                    fill: axis,
-                  }}
+                  tickFormatter={(v: number) => (v === 0 ? "新学" : `${v}天`)}
                 />
                 <YAxis
                   domain={[0, 1]}
@@ -147,34 +216,44 @@ export function RetentionCurve({ data, avgStability }: RetentionCurveProps) {
                   tick={{ fill: axis, fontSize: 11 }}
                   stroke={axis}
                   width={40}
-                  label={{
-                    value: "留存率",
-                    angle: -90,
-                    position: "insideLeft",
-                    fontSize: 11,
-                    fill: axis,
-                  }}
                 />
                 <ReferenceLine
-                  y={0.9}
+                  y={REVIEW_TARGET_RETENTION}
                   stroke={refLine}
                   strokeDasharray="4 4"
-                  label={{ value: "90%", position: "right", fontSize: 11, fill: refLine }}
+                  label={{
+                    value: "90%",
+                    position: "right",
+                    fontSize: 11,
+                    fill: refLine,
+                  }}
                 />
                 <Tooltip content={<CurveTooltip />} cursor={{ stroke: refLine }} />
+                {/* red first so the green maintained curve layers on top */}
                 <Area
                   type="monotone"
-                  dataKey="retention"
-                  stroke={stroke}
+                  dataKey="forgetting"
+                  stroke={red}
                   strokeWidth={2}
-                  fill={fill}
+                  fill="url(#curveRed)"
+                  connectNulls
+                  isAnimationActive={!reduceMotion}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="maintained"
+                  stroke={green}
+                  strokeWidth={2}
+                  fill="url(#curveGreen)"
+                  connectNulls
                   isAnimationActive={!reduceMotion}
                 />
               </AreaChart>
             </ResponsiveContainer>
+
             {avgStability != null && avgStability > 0 && (
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                平均稳定性 {Math.round(avgStability)} 天
+                平均稳定性 {Math.round(avgStability)} 天 · 红线为停止复习后的群体留存
               </p>
             )}
           </>

@@ -141,8 +141,8 @@ export function DonutChart({ distribution, deckId }: DonutChartProps) {
   ];
 
   return (
-    <Card>
-      <CardContent className="space-y-l p-6">
+    <Card className="min-w-0">
+      <CardContent className="min-w-0 space-y-l p-6">
         <ZhCaption zh="卡状态分布" en="CARD DISTRIBUTION" />
 
         <div className="relative">
