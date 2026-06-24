@@ -10,6 +10,51 @@ import {
 } from "../actions";
 
 /**
+ * Copy text to the clipboard with a plain-HTTP fallback.
+ *
+ * The async Clipboard API (`navigator.clipboard`) only exists in a
+ * SECURE context (HTTPS or localhost). The self-hosted deploy is served
+ * over plain HTTP (e.g. http://<host>:8000), where `navigator.clipboard`
+ * is `undefined` — calling `.writeText` there threw synchronously and the
+ * copy button silently did nothing. So we feature-detect the secure path
+ * and otherwise fall back to the legacy `execCommand("copy")` via an
+ * off-screen textarea, which the click's user-gesture permits over HTTP.
+ */
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.clipboard &&
+    window.isSecureContext
+  ) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // fall through to the legacy path
+    }
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "0";
+    ta.style.left = "0";
+    ta.style.opacity = "0";
+    ta.style.pointerEvents = "none";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Deck-share controls (pro settings block). Generates a stable
  * token-link that anyone can open to preview the deck and deep-clone it
  * into their own account (one-time snapshot — no FSRS state copied).
@@ -67,15 +112,16 @@ export function ShareDeckForm({
     });
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!shareUrl) return;
-    navigator.clipboard
-      .writeText(shareUrl)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => setError("复制失败，请手动选择链接"));
+    setError(null);
+    const ok = await copyToClipboard(shareUrl);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      setError("复制失败，请手动选中链接后按 Ctrl / Cmd + C 复制");
+    }
   };
 
   if (!token) {
