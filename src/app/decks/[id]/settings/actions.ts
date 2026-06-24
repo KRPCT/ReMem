@@ -39,6 +39,8 @@ function readStudyPlanForm(fd: FormData): {
   enableFuzz: boolean;
   enableShortTerm: boolean;
   firstSessionTargetProgress: number;
+  ratingButtons: number;
+  newRememberAsEasy: boolean;
 } {
   return {
     newPerDay: Number(fd.get("newPerDay") ?? "0"),
@@ -49,6 +51,8 @@ function readStudyPlanForm(fd: FormData): {
     firstSessionTargetProgress: Number(
       fd.get("firstSessionTargetProgress") ?? "0.8"
     ),
+    ratingButtons: Number(fd.get("ratingButtons") ?? "4"),
+    newRememberAsEasy: fd.get("newRememberAsEasy") === "true",
   };
 }
 

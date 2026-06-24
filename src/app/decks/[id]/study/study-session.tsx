@@ -42,6 +42,11 @@ export interface StudyCard {
    * without a round-trip.
    */
   progress: number;
+  /**
+   * Phase 14: whether this card is still NEW (never graduated). Drives the
+   * "新学时记得视作简单" remap — a new card's Good press is graded Easy.
+   */
+  isNew: boolean;
 }
 
 interface StudySessionProps {
@@ -59,6 +64,47 @@ interface StudySessionProps {
    * (cap before). Surfaced in the UI as "N favorites" affordance.
    */
   totalFavorites?: number;
+  /** Phase 14: number of rating buttons to render (2 | 3 | 4). Default 4. */
+  ratingButtons?: 2 | 3 | 4;
+  /** Phase 14: grade a new card's Good press as Easy ("记得视作简单"). */
+  treatRememberAsEasyOnNew?: boolean;
+}
+
+type RatingDef = {
+  rating: number;
+  label: string;
+  shortKey: string;
+  tone: "destructive" | "warning" | "brand" | "muted";
+};
+
+/**
+ * The rating buttons for a given key count. Collapsing only changes which
+ * buttons render and which 1..4 grade each emits — the FSRS scheduler is
+ * untouched (it always receives a 1..4 grade).
+ *   2 键: 不记得(1) / 记得(3)
+ *   3 键: 重来(1) / 良好(3) / 简单(4)   (drops 困难/Hard — Anki 3-button)
+ *   4 键: 重来(1) / 困难(2) / 良好(3) / 简单(4)
+ */
+function ratingDefsFor(keyCount: number): RatingDef[] {
+  if (keyCount === 2) {
+    return [
+      { rating: 1, label: "不记得", shortKey: "1", tone: "destructive" },
+      { rating: 3, label: "记得", shortKey: "2", tone: "brand" },
+    ];
+  }
+  if (keyCount === 3) {
+    return [
+      { rating: 1, label: "重来", shortKey: "1", tone: "destructive" },
+      { rating: 3, label: "良好", shortKey: "2", tone: "brand" },
+      { rating: 4, label: "简单", shortKey: "3", tone: "muted" },
+    ];
+  }
+  return [
+    { rating: 1, label: "重来", shortKey: "1", tone: "destructive" },
+    { rating: 2, label: "困难", shortKey: "2", tone: "warning" },
+    { rating: 3, label: "良好", shortKey: "3", tone: "brand" },
+    { rating: 4, label: "简单", shortKey: "4", tone: "muted" },
+  ];
 }
 
 // Phase 8 (re-exec): in-session re-test placement for a card that didn't
@@ -123,6 +169,8 @@ export function StudySession({
   initialQueue,
   favoritesOnly = false,
   totalFavorites = 0,
+  ratingButtons = 4,
+  treatRememberAsEasyOnNew = false,
 }: StudySessionProps) {
   // Phase 8 (re-exec): the queue is now STATEFUL. A card whose answer
   // didn't graduate / reach the threshold (server sets
@@ -322,6 +370,14 @@ export function StudySession({
       </Card>
     );
   }
+
+  const ratingDefs = ratingDefsFor(ratingButtons);
+  const ratingGridCols =
+    ratingButtons === 2
+      ? "grid-cols-2"
+      : ratingButtons === 3
+        ? "grid-cols-3"
+        : "grid-cols-2 sm:grid-cols-4";
 
   function handleReveal() {
     setRevealed(true);
@@ -652,45 +708,38 @@ export function StudySession({
                 : "答错了 · 仅可重来"
               : "自评"}
           </p>
-          <div
-            className={cn(
-              "grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3",
-              judgment && !judgment.correct ? "sm:grid-cols-2" : ""
-            )}
-          >
-            <RatingButton
-              rating={1}
-              label="重来"
-              shortKey="1"
-              tone="destructive"
-              onClick={() => handleRate(1)}
-            />
-            {judgment && !judgment.correct ? null : (
-              <>
-                <RatingButton
-                  rating={2}
-                  label="困难"
-                  shortKey="2"
-                  tone="warning"
-                  onClick={() => handleRate(2)}
-                />
-                <RatingButton
-                  rating={3}
-                  label="良好"
-                  shortKey="3"
-                  tone="brand"
-                  onClick={() => handleRate(3)}
-                />
-                <RatingButton
-                  rating={4}
-                  label="简单"
-                  shortKey="4"
-                  tone="muted"
-                  onClick={() => handleRate(4)}
-                />
-              </>
-            )}
-          </div>
+          {judgment && !judgment.correct ? (
+            <div className="grid grid-cols-1 gap-2">
+              <RatingButton
+                rating={1}
+                label="重来"
+                shortKey="1"
+                tone="destructive"
+                onClick={() => handleRate(1)}
+              />
+            </div>
+          ) : (
+            <div className={cn("grid gap-2 sm:gap-3", ratingGridCols)}>
+              {ratingDefs.map((d) => {
+                // "记得视作简单": on a NEW card, the Good(3) press is graded
+                // Easy(4). Non-new cards and the other buttons are unchanged.
+                const emit =
+                  treatRememberAsEasyOnNew && current.isNew && d.rating === 3
+                    ? 4
+                    : d.rating;
+                return (
+                  <RatingButton
+                    key={d.shortKey}
+                    rating={emit}
+                    label={d.label}
+                    shortKey={d.shortKey}
+                    tone={d.tone}
+                    onClick={() => handleRate(emit)}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : null}
     </div>

@@ -61,3 +61,84 @@ export function sampleRetention(
   }
   return points;
 }
+
+/**
+ * Adaptive x-axis span (days) for the two-curve retention chart. The old fixed
+ * 0-60 window left mature decks hugging 100% (a visually dead near-flat line).
+ * Scale the window to the forgetting half-life (9·S days) so the red curve
+ * always drops meaningfully, bounded to [30, 365] days. Falls back to the
+ * default span when stability is not yet established.
+ */
+export function adaptiveRetentionSpan(avgStability: number | null): number {
+  if (
+    avgStability == null ||
+    !Number.isFinite(avgStability) ||
+    avgStability <= 0
+  ) {
+    return RETENTION_DAYS;
+  }
+  return Math.max(30, Math.min(365, Math.round(9 * avgStability * 1.2)));
+}
+
+/**
+ * RED baseline — population expected recall if reviewing stops now. For each
+ * day t it AVERAGES retentionAt(t, S) across every card's own stability, i.e.
+ * the expected fraction of the collection still recalled at t. This is the
+ * statistically sound aggregate: a single curve drawn at the mean stability
+ * misstates the collection (Jensen's inequality), whereas averaging the
+ * per-card retentions does not. Returns [] when no card has an established
+ * stability, so the caller renders the empty state.
+ */
+export function sampleEnsembleRetention(
+  stabilities: number[],
+  days: number = RETENTION_DAYS
+): RetentionPoint[] {
+  const valid = stabilities.filter((s) => Number.isFinite(s) && s > 0);
+  if (valid.length === 0) return [];
+  const points: RetentionPoint[] = [];
+  for (let day = 0; day <= days; day++) {
+    let sum = 0;
+    for (const S of valid) sum += retentionAt(day, S) ?? 0;
+    points.push({ day, retention: sum / valid.length });
+  }
+  return points;
+}
+
+/** At each on-schedule review the maintained-curve sim grows stability by this
+ *  factor. Illustrative only — the live FSRS scheduler computes the real
+ *  per-review stability; this constant just makes the sawtooth teeth widen
+ *  believably as a card matures. */
+export const REVIEW_STABILITY_GROWTH = 1.9;
+/** Retention level that triggers a review in the maintained-curve sim. Matches
+ *  the chart's reference line and the ts-fsrs default request retention. */
+export const REVIEW_TARGET_RETENTION = 0.9;
+
+/**
+ * GREEN overlay — the illustrative "if you keep reviewing on schedule" curve.
+ * Simulates one representative card (starting stability S0): retention decays
+ * via retentionAt until it reaches REVIEW_TARGET_RETENTION, then a review snaps
+ * it back to 1.0 and grows stability by REVIEW_STABILITY_GROWTH, so the teeth
+ * widen as the card matures and the curve holds high. A teaching overlay that
+ * contrasts with the red natural-forgetting curve — it is NOT the live
+ * scheduler. Returns [] for an invalid S0.
+ */
+export function sampleMaintainedRetention(
+  S0: number,
+  days: number = RETENTION_DAYS,
+  target: number = REVIEW_TARGET_RETENTION
+): RetentionPoint[] {
+  if (!Number.isFinite(S0) || S0 <= 0) return [];
+  const points: RetentionPoint[] = [];
+  let S = S0;
+  let lastReviewDay = 0;
+  for (let day = 0; day <= days; day++) {
+    let retention = retentionAt(day - lastReviewDay, S) ?? 0;
+    if (day > lastReviewDay && retention < target) {
+      S *= REVIEW_STABILITY_GROWTH;
+      lastReviewDay = day;
+      retention = 1;
+    }
+    points.push({ day, retention });
+  }
+  return points;
+}

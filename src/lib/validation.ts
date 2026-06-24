@@ -154,11 +154,15 @@ export type CardTypeData = z.infer<typeof cardTypeDataSchema>;
 
 export const cardCreateSchema = z.object({
   deckId: z.string().min(1),
+  // Raised from 20k to allow inline base64 images (data: URIs) embedded in
+  // markdown. A 2 MB image base64-encodes to ~2.7M chars; this cap leaves room
+  // for a couple of images plus text per field. The tradeoff (DB / payload
+  // bloat) is accepted per the chosen base64-inline image strategy.
   frontContent: z
     .string()
-    .max(20_000)
+    .max(8_000_000)
     .min(1, "问题不能为空"),
-  backContent: z.string().max(20_000).default(""),
+  backContent: z.string().max(8_000_000).default(""),
   typeData: cardTypeDataSchema,
   fields: z.record(z.string(), z.string()).default({}),
   isFavorite: z.boolean().default(false),
@@ -240,6 +244,14 @@ export const studyPlanSchema = z.object({
   enableFuzz: z.boolean(),
   enableShortTerm: z.boolean(),
   firstSessionTargetProgress: z.number().min(0.5).max(1.0),
+  // Phase 14: 2/3/4-key rating-bar collapse (study UX, not a scheduler knob;
+  // the emitted grade stays 1..4). Validated to exactly 2 | 3 | 4.
+  ratingButtons: z
+    .number()
+    .int()
+    .refine((v) => v === 2 || v === 3 || v === 4, "选项数量必须是 2/3/4"),
+  // Phase 14: grade a new card's Good press as Easy.
+  newRememberAsEasy: z.boolean(),
 });
 
 export type StudyPlanInput = z.infer<typeof studyPlanSchema>;

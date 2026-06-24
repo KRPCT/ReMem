@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { auth } from "../../auth";
 import { prisma } from "@/lib/prisma";
-import { getReviewHeatmap, sampleRetention } from "@/lib/stats";
+import {
+  adaptiveRetentionSpan,
+  getReviewHeatmap,
+  sampleEnsembleRetention,
+  sampleMaintainedRetention,
+} from "@/lib/stats";
 import type { HeatmapDay, RetentionPoint } from "@/lib/stats";
 import { ReviewHeatmap } from "@/components/stats/heatmap";
 import { RetentionCurveLazy } from "@/components/stats/retention-curve-lazy";
@@ -25,7 +30,9 @@ export default async function HomePage() {
   // query is scoped by userId (multi-tenant).
   let heatmapData: HeatmapDay[] = [];
   let globalAvgStability: number | null = null;
-  let globalRetention: RetentionPoint[] = [];
+  let globalForgetting: RetentionPoint[] = [];
+  let globalMaintained: RetentionPoint[] = [];
+  let globalSpan = adaptiveRetentionSpan(null);
   if (isLoggedIn) {
     const userId = session!.user.id;
     heatmapData = await getReviewHeatmap(userId);
@@ -40,7 +47,12 @@ export default async function HomePage() {
       stabilities.length === 0
         ? null
         : stabilities.reduce((acc, v) => acc + v, 0) / stabilities.length;
-    globalRetention = sampleRetention(globalAvgStability ?? 0);
+    globalSpan = adaptiveRetentionSpan(globalAvgStability);
+    globalForgetting = sampleEnsembleRetention(stabilities, globalSpan);
+    globalMaintained = sampleMaintainedRetention(
+      globalAvgStability ?? 0,
+      globalSpan
+    );
   }
 
   return (
@@ -88,8 +100,10 @@ export default async function HomePage() {
           <div className="mt-6 grid gap-xxl">
             <ReviewHeatmap data={heatmapData} />
             <RetentionCurveLazy
-              data={globalRetention}
+              forgetting={globalForgetting}
+              maintained={globalMaintained}
               avgStability={globalAvgStability}
+              spanDays={globalSpan}
             />
           </div>
         </section>

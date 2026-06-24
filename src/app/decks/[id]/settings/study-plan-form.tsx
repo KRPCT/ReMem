@@ -59,6 +59,9 @@ type StudyPlanFormState = {
   enableFuzz: boolean;
   enableShortTerm: boolean;
   firstSessionTargetProgress: number;
+  // Phase 14: study-UX rating-bar collapse (2|3|4) + new-card remember-as-easy.
+  ratingButtons: number;
+  newRememberAsEasy: boolean;
 };
 
 export interface StudyPlanFormProps {
@@ -105,10 +108,11 @@ export function StudyPlanForm({ deckId, initial, simpleMode = false }: StudyPlan
   const onApplyRecommended = () => {
     // FSRS 6 static defaults: 5 fields + 0.80 threshold (the
     // schema default for firstSessionTargetProgress).
-    setFields({
+    setFields((f) => ({
+      ...f,
       ...FSRS_RECOMMENDED_VALUES,
       firstSessionTargetProgress: 0.8,
-    });
+    }));
   };
 
   // Phase 08-04: "智能推荐 v6" button. Calls the server action
@@ -131,14 +135,15 @@ export function StudyPlanForm({ deckId, initial, simpleMode = false }: StudyPlan
   useEffect(() => {
     if (recommendState?.ok && recommendState.values) {
       const v = recommendState.values;
-      setFields({
+      setFields((f) => ({
+        ...f,
         newPerDay: v.newPerDay,
         reviewsPerDay: v.reviewsPerDay,
         requestRetention: v.requestRetention,
         enableFuzz: v.enableFuzz,
         enableShortTerm: v.enableShortTerm,
         firstSessionTargetProgress: v.firstSessionTargetProgress,
-      });
+      }));
       // Show a brief "why these numbers" line so the user can
       // see whether the recommendation came from their history
       // or fell back to Anki Desktop defaults.
@@ -173,7 +178,9 @@ export function StudyPlanForm({ deckId, initial, simpleMode = false }: StudyPlan
     fields.enableFuzz !== initial.enableFuzz ||
     fields.enableShortTerm !== initial.enableShortTerm ||
     fields.firstSessionTargetProgress !==
-      initial.firstSessionTargetProgress;
+      initial.firstSessionTargetProgress ||
+    fields.ratingButtons !== initial.ratingButtons ||
+    fields.newRememberAsEasy !== initial.newRememberAsEasy;
 
   return (
     <form action={formAction} className="space-y-5">
@@ -208,6 +215,71 @@ export function StudyPlanForm({ deckId, initial, simpleMode = false }: StudyPlan
         name="firstSessionTargetProgress"
         value={String(fields.firstSessionTargetProgress)}
       />
+      <input
+        type="hidden"
+        name="ratingButtons"
+        value={String(fields.ratingButtons)}
+      />
+      <input
+        type="hidden"
+        name="newRememberAsEasy"
+        value={fields.newRememberAsEasy ? "true" : "false"}
+      />
+
+      {/* Phase 14: rating-bar key count + new-card remember-as-easy. Study UX,
+          shown in both simple and pro mode (it changes how you grade, not an
+          advanced FSRS scheduler knob). */}
+      <div className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor="ratingButtons-group">选项数量</Label>
+          <div
+            id="ratingButtons-group"
+            role="group"
+            aria-label="评分按钮数量"
+            className="inline-flex rounded-lg border border-border bg-card/40 p-0.5"
+          >
+            {([2, 3, 4] as const).map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() =>
+                  setFields((f) => ({ ...f, ratingButtons: n }))
+                }
+                aria-pressed={fields.ratingButtons === n}
+                data-pressed={fields.ratingButtons === n}
+                className="h-9 min-w-[3.5rem] rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors data-[pressed=true]:bg-brand/15 data-[pressed=true]:text-brand"
+              >
+                {n} 键
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            学习时评分按钮数量。2 键 = 不记得 / 记得；3 键 = 重来 / 良好 / 简单；
+            4 键 = 完整 FSRS 评分。简并只改按钮，调度仍是 FSRS。
+          </p>
+        </div>
+
+        <label
+          htmlFor="newRememberAsEasy"
+          className="flex cursor-pointer items-start gap-m rounded-xl border border-border bg-card/40 px-m py-3 text-sm transition-colors hover:bg-card/60"
+        >
+          <input
+            id="newRememberAsEasy"
+            type="checkbox"
+            checked={fields.newRememberAsEasy}
+            onChange={(e) =>
+              setFields((f) => ({ ...f, newRememberAsEasy: e.target.checked }))
+            }
+            className="mt-0.5 h-4 w-4 shrink-0 rounded-sm"
+          />
+          <span>
+            新学时「记得」视作「简单」
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              延长新卡首个复习间隔、减小复习压力
+            </span>
+          </span>
+        </label>
+      </div>
 
       {/* Daily caps — paired 2-col on >= md, 1-col on mobile. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

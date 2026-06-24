@@ -10,7 +10,12 @@ import { ProgressBadge } from "@/components/ui/progress-badge";
 import { buildQueue, STUDY_PLAN_DEFAULTS } from "@/lib/fsrs";
 import { CardList } from "./cards/card-list";
 import { CardGallery } from "./cards/card-gallery";
-import { bucketCardStates, sampleRetention } from "@/lib/stats";
+import {
+  adaptiveRetentionSpan,
+  bucketCardStates,
+  sampleEnsembleRetention,
+  sampleMaintainedRetention,
+} from "@/lib/stats";
 import { DonutChartLazy } from "@/components/stats/donut-chart-lazy";
 import { RetentionCurveLazy } from "@/components/stats/retention-curve-lazy";
 
@@ -102,7 +107,12 @@ export default async function DeckDetailPage({
     deckStabilities.length === 0
       ? null
       : deckStabilities.reduce((acc, v) => acc + v, 0) / deckStabilities.length;
-  const deckRetention = sampleRetention(deckAvgStability ?? 0);
+  const deckSpan = adaptiveRetentionSpan(deckAvgStability);
+  const deckForgetting = sampleEnsembleRetention(deckStabilities, deckSpan);
+  const deckMaintained = sampleMaintainedRetention(
+    deckAvgStability ?? 0,
+    deckSpan
+  );
 
   return (
     <main className="mx-auto max-w-content space-y-4 px-4 py-12 md:px-6 md:py-14">
@@ -222,7 +232,12 @@ export default async function DeckDetailPage({
         <ZhTitle zh="学习统计" en="DECK STATISTICS" size="h2" as="h2" />
         <div className="grid gap-l md:grid-cols-2">
           <DonutChartLazy distribution={deckDistribution} deckId={deck.id} />
-          <RetentionCurveLazy data={deckRetention} avgStability={deckAvgStability} />
+          <RetentionCurveLazy
+            forgetting={deckForgetting}
+            maintained={deckMaintained}
+            avgStability={deckAvgStability}
+            spanDays={deckSpan}
+          />
         </div>
       </section>
 

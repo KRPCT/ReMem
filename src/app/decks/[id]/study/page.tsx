@@ -62,6 +62,20 @@ export default async function StudyPage({
     orderBy: { createdAt: "asc" },
   });
 
+  // Phase 14: per-deck rating-bar settings. Independent of cram/normal — the
+  // 2/3/4-key collapse and the new-card Good->Easy remap are UI-layer, so they
+  // apply in both modes. A separate single-row read (the normal-mode plan query
+  // below only selects scheduler fields).
+  const ratingPlan = await prisma.studyPlan.findUnique({
+    where: { deckId },
+    select: { ratingButtons: true, newRememberAsEasy: true },
+  });
+  const ratingButtons: 2 | 3 | 4 =
+    ratingPlan?.ratingButtons === 2 || ratingPlan?.ratingButtons === 3
+      ? ratingPlan.ratingButtons
+      : 4;
+  const treatRememberAsEasyOnNew = ratingPlan?.newRememberAsEasy ?? false;
+
   // 3. 算队列 + totalFavorites。buildResult 提到 if/else 之前
   //    (isCram 时为 null),totalFavorites 与 queueItems 都从它
   //    派生,避免在两个分支里各算一次造成漂移。
@@ -80,6 +94,9 @@ export default async function StudyPage({
     // Phase 08-02: per-card FSRS 6 progress (0-1 float) for the
     // top-of-card hairline bar.
     progress: number;
+    // Phase 14: is this card still NEW (never graduated)? Drives the
+    // "记得视作简单" Good->Easy remap in the rating bar.
+    isNew: boolean;
   }> = [];
   let totalCounts = { newCount: 0, learnCount: 0, reviewCount: 0 };
   let buildResult: ReturnType<typeof buildQueue> | null = null;
@@ -122,6 +139,7 @@ export default async function StudyPage({
       // Phase 08-02: per-card FSRS 6 progress (0-1 float) for
       // the top-of-card hairline bar.
       progress: c.progress,
+      isNew: !c.cardState || c.cardState.state === "new",
     }));
   } else {
     queueItems = buildResult!.queue.map((item) => ({
@@ -138,6 +156,10 @@ export default async function StudyPage({
       // card isn't in the joined set (defensive — shouldn't happen
       // since the queue is built from these same cards).
       progress: cards.find((c) => c.id === item.cardId)?.progress ?? 0,
+      isNew: (() => {
+        const cs = cards.find((c) => c.id === item.cardId)?.cardState;
+        return !cs || cs.state === "new";
+      })(),
     }));
     totalCounts = {
       newCount: buildResult!.newCount,
@@ -245,6 +267,8 @@ export default async function StudyPage({
         initialQueue={queueItems}
         favoritesOnly={favoritesOnly}
         totalFavorites={totalFavorites}
+        ratingButtons={ratingButtons}
+        treatRememberAsEasyOnNew={treatRememberAsEasyOnNew}
       />
     </main>
   );

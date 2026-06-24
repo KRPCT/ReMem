@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { MarkdownEditor } from "@/components/editor/markdown-editor";
+import { fileToDataUri } from "@/lib/image-data-uri";
 import type {
   CardType,
   CardTypeData,
@@ -237,6 +238,7 @@ export function CardForm({
                 onChange={setFrontContent}
                 placeholder="问题（Markdown）..."
                 ariaLabel="问题编辑器"
+                onImageUpload={fileToDataUri}
               />
             </div>
           </FormSection>
@@ -256,6 +258,7 @@ export function CardForm({
                 onChange={setBackContent}
                 placeholder="答案（Markdown）..."
                 ariaLabel="答案编辑器"
+                onImageUpload={fileToDataUri}
               />
             </div>
           </FormSection>
@@ -276,6 +279,7 @@ export function CardForm({
                 onChange={setFrontContent}
                 placeholder="问题（Markdown）..."
                 ariaLabel="问题编辑器"
+                onImageUpload={fileToDataUri}
               />
             </div>
           </FormSection>
@@ -376,6 +380,7 @@ export function CardForm({
                   onChange={setBackContent}
                   placeholder="解析 / 解释（Markdown，可选）..."
                   ariaLabel="解析编辑器"
+                  onImageUpload={fileToDataUri}
                 />
               </div>
             </details>

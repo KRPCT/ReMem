@@ -177,8 +177,8 @@ export function ReviewHeatmap({ data }: ReviewHeatmapProps) {
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-l p-6">
+    <Card className="min-w-0">
+      <CardContent className="min-w-0 space-y-l p-6">
         <ZhCaption zh="复习热力图" en="REVIEW HEATMAP" />
 
         <div ref={containerRef} className="relative">

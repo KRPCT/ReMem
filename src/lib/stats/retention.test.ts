@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { retentionAt, sampleRetention, RETENTION_DAYS } from "./retention";
+import {
+  retentionAt,
+  sampleRetention,
+  RETENTION_DAYS,
+  adaptiveRetentionSpan,
+  sampleEnsembleRetention,
+  sampleMaintainedRetention,
+} from "./retention";
 
 describe("retentionAt", () => {
   it("R(0) = 1.0 for any positive S", () => {
@@ -69,5 +76,72 @@ describe("sampleRetention", () => {
 
   it("respects a custom day span", () => {
     expect(sampleRetention(10, 30)).toHaveLength(31);
+  });
+});
+
+describe("adaptiveRetentionSpan", () => {
+  it("falls back to RETENTION_DAYS for null/invalid S", () => {
+    expect(adaptiveRetentionSpan(null)).toBe(RETENTION_DAYS);
+    expect(adaptiveRetentionSpan(0)).toBe(RETENTION_DAYS);
+    expect(adaptiveRetentionSpan(-3)).toBe(RETENTION_DAYS);
+    expect(adaptiveRetentionSpan(NaN)).toBe(RETENTION_DAYS);
+  });
+
+  it("scales to ~1.2 forgetting half-lives, clamped to [30, 365]", () => {
+    expect(adaptiveRetentionSpan(1)).toBe(30); // 9*1*1.2=10.8 -> clamp up to 30
+    expect(adaptiveRetentionSpan(10)).toBe(108); // round(9*10*1.2)
+    expect(adaptiveRetentionSpan(1000)).toBe(365); // clamp down
+  });
+});
+
+describe("sampleEnsembleRetention", () => {
+  it("returns [] when no card has an established stability", () => {
+    expect(sampleEnsembleRetention([])).toEqual([]);
+    expect(sampleEnsembleRetention([0, -1, NaN])).toEqual([]);
+  });
+
+  it("averages the per-card retentions, not retention-at-mean (Jensen)", () => {
+    const pts = sampleEnsembleRetention([1, 100], 9);
+    const r1 = retentionAt(9, 1)!;
+    const r2 = retentionAt(9, 100)!;
+    expect(pts[9].retention).toBeCloseTo((r1 + r2) / 2, 10);
+  });
+
+  it("day 0 retention is 1 (all cards fully recalled)", () => {
+    expect(sampleEnsembleRetention([5, 20, 50])[0]).toEqual({
+      day: 0,
+      retention: 1,
+    });
+  });
+
+  it("ignores invalid stabilities mixed into the input", () => {
+    expect(sampleEnsembleRetention([10, 0, NaN, -2], 5)).toEqual(
+      sampleEnsembleRetention([10], 5)
+    );
+  });
+});
+
+describe("sampleMaintainedRetention", () => {
+  it("returns [] for an invalid S0", () => {
+    expect(sampleMaintainedRetention(0)).toEqual([]);
+    expect(sampleMaintainedRetention(NaN)).toEqual([]);
+  });
+
+  it("starts at 1.0 and holds at/above the review target band", () => {
+    const target = 0.9;
+    const pts = sampleMaintainedRetention(5, 120, target);
+    expect(pts[0]).toEqual({ day: 0, retention: 1 });
+    for (const p of pts) {
+      expect(p.retention).toBeGreaterThanOrEqual(target - 1e-9);
+    }
+  });
+
+  it("stays well above the natural-forgetting curve at the horizon", () => {
+    const span = 120;
+    const maintained = sampleMaintainedRetention(5, span);
+    const forgetting = sampleEnsembleRetention([5], span);
+    expect(maintained[span].retention).toBeGreaterThan(
+      forgetting[span].retention
+    );
   });
 });
