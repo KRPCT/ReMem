@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth-helpers";
+import { getUserPrefs } from "@/lib/user-settings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ZhTitle } from "@/components/typography/zh-title";
@@ -35,6 +36,9 @@ export default async function DeckDetailPage({
   const userId = await requireUserId();
   // Anything other than the literal "list" is the gallery default.
   const useListView = view === "list";
+  // B2: account-level "browse defaults to revealed" pref, seeded into
+  // the gallery/list preview modal.
+  const { browseDefaultShowAnswer } = await getUserPrefs(userId);
 
   const deck = await prisma.deck.findFirst({
     where: { id, userId },
@@ -272,12 +276,14 @@ export default async function DeckDetailPage({
               key="list"
               deckId={deck.id}
               cards={deck.cards}
+              defaultShowAnswer={browseDefaultShowAnswer}
             />
           ) : (
             <CardGallery
               key="gallery"
               deckId={deck.id}
               cards={deck.cards}
+              defaultShowAnswer={browseDefaultShowAnswer}
             />
           )}
         </CardContent>

@@ -25,6 +25,13 @@ interface CardDetailModalProps {
   deckId: string;
   card: CardDetail | null;
   onClose: () => void;
+  /**
+   * B2 `browseDefaultShowAnswer`: when true, the preview opens with the
+   * answer already revealed. The modal remounts per card open (the
+   * parent unmounts it when `activeCardId` is null), so this seeds the
+   * initial reveal state fresh for every card.
+   */
+  defaultShowAnswer?: boolean;
 }
 
 /**
@@ -52,16 +59,20 @@ interface CardDetailModalProps {
  * one-click away. The "编辑" link is the only way out of the modal
  * for an edit operation — it routes to the card edit page.
  */
-export function CardDetailModal({ deckId, card, onClose }: CardDetailModalProps) {
-  const [showAnswer, setShowAnswer] = useState(false);
+export function CardDetailModal({
+  deckId,
+  card,
+  onClose,
+  defaultShowAnswer = false,
+}: CardDetailModalProps) {
+  const [showAnswer, setShowAnswer] = useState(defaultShowAnswer);
 
-  // Reset reveal state when the card changes (or the modal closes).
-  // Without this, switching cards would leak the previous reveal
-  // into the next card's body.
-  // We can't use useEffect for a derived state, so the parent passes
-  // `card` and the local state is intentionally fresh on remount.
-  // (Remount is guaranteed because the parent unmounts the modal
-  // when `activeCardId` is null — see CardGallery/CardList.)
+  // The reveal state is intentionally fresh on every open: the parent
+  // (CardGallery/CardList) renders this modal with a `key` bound to the
+  // active card id, which forces a remount per card so this `useState`
+  // re-seeds from `defaultShowAnswer`. Without that key the component
+  // stays mounted (it returns null when closed) and would leak the
+  // previous card's reveal state into the next card.
 
   if (!card) {
     return null;

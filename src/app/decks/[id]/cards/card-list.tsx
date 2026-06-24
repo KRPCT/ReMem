@@ -42,6 +42,8 @@ interface CardListCard {
 interface CardListProps {
   deckId: string;
   cards: CardListCard[];
+  /** B2: open the preview modal answer-revealed (browseDefaultShowAnswer). */
+  defaultShowAnswer?: boolean;
 }
 
 function CardListEmpty({ deckId }: { deckId: string }) {
@@ -65,7 +67,11 @@ function CardListNoMatches() {
   );
 }
 
-export function CardList({ deckId, cards }: CardListProps) {
+export function CardList({
+  deckId,
+  cards,
+  defaultShowAnswer = false,
+}: CardListProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -334,10 +340,18 @@ export function CardList({ deckId, cards }: CardListProps) {
         </div>
       )}
 
+      {/*
+        key on the active card id forces a fresh mount per card so the
+        modal's internal `showAnswer` re-seeds from `defaultShowAnswer`
+        each open (the modal is otherwise always mounted and would
+        persist the previous card's reveal state).
+      */}
       <CardDetailModal
+        key={activeCardId ?? "closed"}
         deckId={deckId}
         card={activeCard}
         onClose={closeModal}
+        defaultShowAnswer={defaultShowAnswer}
       />
     </div>
   );

@@ -14,6 +14,7 @@ import { DeckColorForm } from "./deck-color-form";
 import { StudyPlanForm } from "./study-plan-form";
 import { ResetProgressDialog } from "./reset-progress-dialog";
 import { SettingsModeToggle } from "./settings-mode-toggle";
+import { ShareDeckForm } from "./share-deck-form";
 
 interface DeckSettingsPageProps {
   params: Promise<{ id: string }>;
@@ -166,6 +167,22 @@ export default async function DeckSettingsPage({
           />
         </CardContent>
       </Card>
+
+      {/* ── Pro-only: 分享牌组 ─────────────────────────────────────── */}
+      {mode === "pro" && (
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            <div className="space-y-1">
+              <ZhCaption zh="分享牌组" en="SHARE DECK" enFirst />
+              <p className="text-sm text-muted-foreground">
+                生成一个分享链接，别人打开即可预览并把这套牌组复制到自己的账户。
+                复制是一次性快照（含卡片与模板，不含你的复习记录与学习进度）。
+              </p>
+            </div>
+            <ShareDeckForm deckId={deck.id} initialToken={deck.shareToken} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Pro-only: 重置 + 危险操作 ─────────────────────────────── */}
       {mode === "pro" && (

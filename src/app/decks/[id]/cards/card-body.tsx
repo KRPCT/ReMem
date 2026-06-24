@@ -82,6 +82,14 @@ export interface CardBodyProps {
    * verdict still locked and the multi-choice options disabled.
    */
   revealKey?: number;
+  /**
+   * B2 `autoRevealCloze`. When true (default = current behavior),
+   * revealing the card fills in every cloze blank at once. When false,
+   * each blank stays masked after reveal until individually tapped —
+   * per-blank active recall. Only the study session threads this; the
+   * browse modal leaves it at the default.
+   */
+  autoRevealCloze?: boolean;
 }
 
 /**
@@ -435,9 +443,16 @@ function findClozeBlanks(
 function renderFillQuestion(
   source: string,
   typeData: { answers: string[] },
-  revealed: boolean
+  revealed: boolean,
+  opts?: {
+    /** false = per-blank tap-to-reveal (B2 autoRevealCloze). Default true. */
+    autoReveal?: boolean;
+    revealedBlanks?: ReadonlySet<number>;
+    onRevealBlank?: (index: number) => void;
+  }
 ): React.ReactNode {
   const cloze = findClozeBlanks(source);
+  const autoReveal = opts?.autoReveal ?? true;
 
   // Path 1: Anki-style cloze markers
   if (cloze.length > 0) {
@@ -450,11 +465,33 @@ function renderFillQuestion(
       if (before) {
         segments.push(<MarkdownInline key={`m-${i}`} content={before} />);
       }
-      // Blank: use answer if revealed and available, else hint, else "____".
       const answer = typeData.answers[c.index - 1];
-      const display = revealed
-        ? answer ?? c.hint ?? "____"
-        : "____";
+      // In auto-reveal mode the blank fills the moment the card is
+      // revealed. In manual mode it only fills once this specific blank
+      // has been tapped (per-blank active recall).
+      const blankShown = autoReveal
+        ? revealed
+        : (opts?.revealedBlanks?.has(c.index) ?? false);
+
+      if (!blankShown && !autoReveal && revealed) {
+        // Card revealed but this blank still masked: render a tappable
+        // chip so the user can check one blank at a time.
+        segments.push(
+          <button
+            key={`b-${i}`}
+            type="button"
+            onClick={() => opts?.onRevealBlank?.(c.index)}
+            className="mx-1 inline-block min-w-[3ch] rounded-md border border-dashed border-brand/60 bg-brand/10 px-2 py-0.5 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-brand transition-colors hover:bg-brand/20"
+            aria-label={`显示第 ${c.index} 空答案`}
+          >
+            点击显示
+          </button>
+        );
+        cursor = c.end;
+        return;
+      }
+
+      const display = blankShown ? answer ?? c.hint ?? "____" : "____";
       segments.push(
         <span
           key={`b-${i}`}
@@ -582,6 +619,7 @@ export function CardBody({
   interactive = false,
   onJudged,
   revealKey = 0,
+  autoRevealCloze = true,
 }: CardBodyProps) {
   const front = frontContent ?? "";
   const back = backContent ?? "";
@@ -610,6 +648,11 @@ export function CardBody({
   // toggle is wrong for multi-choice (the user might be mid-pick
   // when an accidental click counts as a wrong answer).
   const [multiPicks, setMultiPicks] = useState<number[]>([]);
+  // B2 autoRevealCloze=false: the set of 1-based cloze blank indices the
+  // user has individually tapped to reveal. Reset on every card change.
+  const [revealedBlanks, setRevealedBlanks] = useState<ReadonlySet<number>>(
+    () => new Set<number>()
+  );
 
   // Reset judgment whenever the card identity changes (e.g. user
   // advances to the next card in the study session). The key is the
@@ -617,7 +660,16 @@ export function CardBody({
   useEffect(() => {
     setJudgment(null);
     setMultiPicks([]);
+    setRevealedBlanks(new Set<number>());
   }, [cardId, frontContent, backContent, revealKey]);
+
+  const revealBlank = useCallback((index: number) => {
+    setRevealedBlanks((prev) => {
+      const next = new Set(prev);
+      next.add(index);
+      return next;
+    });
+  }, []);
 
   // === Shuffle (choice / multi_choice) =============================
   const shouldShuffle =
@@ -968,10 +1020,19 @@ export function CardBody({
       {effectiveType === "fill" && data.type === "fill" ? (
         <>
           <Question>
-            {renderFillQuestion(front, data, effectiveShowAnswer)}
+            {renderFillQuestion(front, data, effectiveShowAnswer, {
+              autoReveal: autoRevealCloze,
+              revealedBlanks,
+              onRevealBlank: revealBlank,
+            })}
           </Question>
-          {/* Equivalent answers panel — only shown after reveal. */}
-          {effectiveShowAnswer && data.answers.length > 0 ? (
+          {/*
+            Equivalent-answers panel. Auto-reveal shows it once the card
+            is revealed. In manual (per-blank) mode it stays hidden —
+            surfacing every answer there would defeat the per-blank
+            recall the user opted into.
+          */}
+          {autoRevealCloze && effectiveShowAnswer && data.answers.length > 0 ? (
             <AnswerPanel>
               <div className="flex flex-wrap gap-2">
                 {data.answers.map((a, i) => (

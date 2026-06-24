@@ -12,7 +12,7 @@ const PUBLIC_PREFIXES = [
   "/sw.js",
   "/logo.png",
 ];
-const PUBLIC_GLOBS = ["/icons/", "/api/auth/"];
+const PUBLIC_GLOBS = ["/icons/", "/api/auth/", "/share/"];
 
 export default auth((req) => {
   const { nextUrl } = req;

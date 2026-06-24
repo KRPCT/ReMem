@@ -29,6 +29,31 @@ model User {
   reviewLogs ReviewLog[]
   studyPlans StudyPlan[]
   noteTypes  NoteType[]
+  settings   UserSettings?
+}
+
+// ─── Account-level UX preferences (B2) ───────────────────
+// One row per user (userId @unique). Three global study/browse
+// toggles that are NOT per-deck scheduler semantics (those live on
+// StudyPlan). Lazily upserted by the /settings form — a user with no
+// row yet falls back to these column defaults everywhere they're read.
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+  // Show the post-rating "next review in N days" line in the study
+  // session (the answer action already returns scheduledDays/due).
+  showNextReviewTime Boolean @default(false)
+  // Default the gallery preview modal to answer-revealed. Study always
+  // hides the answer first regardless of this flag.
+  browseDefaultShowAnswer Boolean @default(false)
+  // When true (default = current behavior), cloze blanks fill in with
+  // the answer the moment the card is revealed. When false, each blank
+  // stays masked until individually tapped (per-blank active recall).
+  autoRevealCloze Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Account {
@@ -82,6 +107,10 @@ model Deck {
   // has a stable theme color.
   themeColor     String?
   settingsMode   String   @default("simple")  // "simple" | "pro" (D-15)
+  // Deck-share token. When non-null, anyone with the link can preview
+  // the deck at /share/[token] and deep-clone it into their own account
+  // (one-time snapshot — NO CardState/ReviewLog copied). null = private.
+  shareToken     String?  @unique
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

@@ -27,6 +27,8 @@ export interface CardGalleryCard {
 interface CardGalleryProps {
   deckId: string;
   cards: CardGalleryCard[];
+  /** B2: open the preview modal answer-revealed (browseDefaultShowAnswer). */
+  defaultShowAnswer?: boolean;
 }
 
 /**
@@ -41,7 +43,11 @@ interface CardGalleryProps {
  * a backdrop click. The `?view=` URL param is owned by the page
  * wrapper; this component only knows the filtered card list.
  */
-export function CardGallery({ deckId, cards }: CardGalleryProps) {
+export function CardGallery({
+  deckId,
+  cards,
+  defaultShowAnswer = false,
+}: CardGalleryProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
@@ -140,10 +146,19 @@ export function CardGallery({ deckId, cards }: CardGalleryProps) {
         </ul>
       )}
 
+      {/*
+        key on the active card id forces a fresh mount per card so the
+        modal's internal `showAnswer` state re-seeds from
+        `defaultShowAnswer` every open (CardDetailModal is otherwise
+        always mounted — it returns null when closed — so its useState
+        would persist the previous card's reveal state).
+      */}
       <CardDetailModal
+        key={activeCardId ?? "closed"}
         deckId={deckId}
         card={activeCard}
         onClose={closeModal}
+        defaultShowAnswer={defaultShowAnswer}
       />
     </div>
   );

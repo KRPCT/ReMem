@@ -7,6 +7,7 @@ import { AuthError } from "next-auth";
 import { auth } from "../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { deckUpdateSchema, themeColorSchema } from "@/lib/validation";
+import { generateShareToken } from "@/lib/share-token";
 
 type ActionState = {
   error?: string;
@@ -217,6 +218,96 @@ export async function updateDeckColorAction(
     revalidatePath(`/decks/${deck.id}`);
     revalidatePath(`/decks/${deck.id}/settings`);
     return null;
+  } catch (e) {
+    if (e instanceof AuthError || e instanceof ZodError) throw e;
+    throw e;
+  }
+}
+
+// ─── Deck sharing (token-link clone snapshot) ─────────────────────────
+
+export type ShareLinkState =
+  | { ok?: true; shareToken?: string | null; error?: string }
+  | null;
+
+/**
+ * Generate (or return the existing) share token for a deck. Idempotent:
+ * if the deck already has a token we return it unchanged so the link
+ * stays stable across re-shares. Ownership is checked before any write.
+ *
+ * On the astronomically-unlikely unique-constraint collision we retry
+ * once with a fresh token (the @unique on Deck.shareToken is the real
+ * backstop).
+ */
+export async function generateShareLinkAction(
+  _prev: ShareLinkState,
+  formData: FormData
+): Promise<ShareLinkState> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { error: "未登录" };
+
+    const id = formData.get("id");
+    if (typeof id !== "string") return { error: "缺少牌组 id" };
+
+    const deck = await prisma.deck.findFirst({
+      where: { id, userId: session.user.id },
+      select: { id: true, shareToken: true },
+    });
+    if (!deck) return { error: "未找到牌组" };
+
+    if (deck.shareToken) {
+      return { ok: true, shareToken: deck.shareToken };
+    }
+
+    let token = generateShareToken();
+    try {
+      await prisma.deck.update({
+        where: { id: deck.id },
+        data: { shareToken: token },
+      });
+    } catch {
+      // Collision (or a concurrent enable) — retry once with a fresh token.
+      token = generateShareToken();
+      await prisma.deck.update({
+        where: { id: deck.id },
+        data: { shareToken: token },
+      });
+    }
+
+    revalidatePath(`/decks/${deck.id}/settings`);
+    return { ok: true, shareToken: token };
+  } catch (e) {
+    if (e instanceof AuthError || e instanceof ZodError) throw e;
+    throw e;
+  }
+}
+
+/**
+ * Revoke a deck's share token. Existing copies already imported are
+ * unaffected (they're independent snapshots); only the live link stops
+ * resolving. Idempotent — clearing an already-null token is a no-op.
+ */
+export async function disableShareLinkAction(
+  _prev: ShareLinkState,
+  formData: FormData
+): Promise<ShareLinkState> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { error: "未登录" };
+
+    const id = formData.get("id");
+    if (typeof id !== "string") return { error: "缺少牌组 id" };
+
+    // Ownership-scoped write; updateMany is idempotent (count 0 if the
+    // deck is gone or not owned) so a stale request can't 500.
+    await prisma.deck.updateMany({
+      where: { id, userId: session.user.id },
+      data: { shareToken: null },
+    });
+
+    revalidatePath(`/decks/${id}/settings`);
+    return { ok: true, shareToken: null };
   } catch (e) {
     if (e instanceof AuthError || e instanceof ZodError) throw e;
     throw e;

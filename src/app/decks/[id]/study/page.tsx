@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth-helpers";
+import { getUserPrefs } from "@/lib/user-settings";
 import { buildQueue, STUDY_PLAN_DEFAULTS } from "@/lib/fsrs";
 import type { StudyPlanShape } from "@/lib/fsrs/queue";
 import { ZhTitle } from "@/components/typography/zh-title";
@@ -75,6 +76,9 @@ export default async function StudyPage({
       ? ratingPlan.ratingButtons
       : 4;
   const treatRememberAsEasyOnNew = ratingPlan?.newRememberAsEasy ?? false;
+
+  // B2: account-level study prefs (next-review line + cloze auto-reveal).
+  const { showNextReviewTime, autoRevealCloze } = await getUserPrefs(userId);
 
   // 3. 算队列 + totalFavorites。buildResult 提到 if/else 之前
   //    (isCram 时为 null),totalFavorites 与 queueItems 都从它
@@ -269,6 +273,8 @@ export default async function StudyPage({
         totalFavorites={totalFavorites}
         ratingButtons={ratingButtons}
         treatRememberAsEasyOnNew={treatRememberAsEasyOnNew}
+        showNextReviewTime={showNextReviewTime}
+        autoRevealCloze={autoRevealCloze}
       />
     </main>
   );

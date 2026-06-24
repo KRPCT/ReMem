@@ -68,6 +68,34 @@ interface StudySessionProps {
   ratingButtons?: 2 | 3 | 4;
   /** Phase 14: grade a new card's Good press as Easy ("记得视作简单"). */
   treatRememberAsEasyOnNew?: boolean;
+  /**
+   * B2 `showNextReviewTime`: surface a "下次复习 N 天后" line after each
+   * rating (derived from the answer action's returned due/scheduledDays).
+   */
+  showNextReviewTime?: boolean;
+  /**
+   * B2 `autoRevealCloze`: forwarded to CardBody. false = per-blank
+   * tap-to-reveal for fill cards.
+   */
+  autoRevealCloze?: boolean;
+}
+
+/**
+ * Human-friendly "next review" label from the FSRS due timestamp.
+ * Works for both learning steps (minutes/hours) and review intervals
+ * (days) by diffing the due date against now, so it stays accurate
+ * regardless of scheduledDays granularity.
+ */
+function formatNextReview(dueIso: string | null): string {
+  if (!dueIso) return "";
+  const ms = new Date(dueIso).getTime() - Date.now();
+  if (ms <= 0) return "稍后";
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return `${mins} 分钟后`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} 小时后`;
+  const days = Math.round(hours / 24);
+  return `${days} 天后`;
 }
 
 type RatingDef = {
@@ -171,6 +199,8 @@ export function StudySession({
   totalFavorites = 0,
   ratingButtons = 4,
   treatRememberAsEasyOnNew = false,
+  showNextReviewTime = false,
+  autoRevealCloze = true,
 }: StudySessionProps) {
   // Phase 8 (re-exec): the queue is now STATEFUL. A card whose answer
   // didn't graduate / reach the threshold (server sets
@@ -208,6 +238,10 @@ export function StudySession({
   const [lastAnsweredCardId, setLastAnsweredCardId] = useState<string | null>(
     null
   );
+  // B2 showNextReviewTime: the "next review" label for the most recently
+  // rated card. Set on each successful answer, cleared on undo. Null when
+  // the pref is off or no rating has happened yet.
+  const [lastReviewLabel, setLastReviewLabel] = useState<string | null>(null);
   const [undoError, setUndoError] = useState<string | null>(null);
   const [judgment, setJudgment] = useState<{
     correct: boolean;
@@ -309,6 +343,9 @@ export function StudySession({
       setIndex((i) => Math.max(0, i - 1));
       setRevealed(false);
       setReviewed((n) => Math.max(0, n - 1));
+      // The just-shown "next review" line referred to the rating we are
+      // undoing — clear it so it can't mislead.
+      setLastReviewLabel(null);
       // If the rewound card was an "Again" re-queue, the queue still
       // carries it at the tail — best effort, MVP.
     });
@@ -446,6 +483,13 @@ export function StudySession({
           ...prev,
           [capturedCardId]: newProgress,
         }));
+      }
+
+      // B2 showNextReviewTime: derive the "下次复习" label from the
+      // freshly-scheduled due date. Computed here (not in the optimistic
+      // block) because the interval is only known after the server write.
+      if (showNextReviewTime) {
+        setLastReviewLabel(formatNextReview(result.newState?.due ?? null));
       }
 
       // Phase 8 (re-exec): the scheduling strategy tells us (via
@@ -605,6 +649,14 @@ export function StudySession({
             {undoError}
           </p>
         ) : null}
+        {showNextReviewTime && lastReviewLabel ? (
+          <p
+            className="text-right font-mono text-[10px] text-brand"
+            aria-live="polite"
+          >
+            上一张 · 下次复习 {lastReviewLabel}
+          </p>
+        ) : null}
       </div>
 
       {/* === 卡片 === 复用 cards/ 下的 CardBody,支持全部 5 种题型 */}
@@ -680,6 +732,7 @@ export function StudySession({
             interactive
             onJudged={handleJudged}
             revealKey={revealKey}
+            autoRevealCloze={autoRevealCloze}
           />
 
           {/* 显示答案按钮(未揭示时) —— 只在用户尚未自评时出现 */}
